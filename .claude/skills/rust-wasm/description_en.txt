@@ -1,1 +1,0 @@
-Master WebAssembly with Rust - wasm-pack, wasm-bindgen, and browser integration
