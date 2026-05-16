@@ -156,5 +156,13 @@
   "text_display_toggles": "텍스트 표시",
   "toggle_show_city": "도시 이름",
   "toggle_show_country": "국가 이름",
-  "toggle_show_coords": "좌표"
+  "toggle_show_coords": "좌표",
+  "support_button": "후원",
+  "support_title": "프로젝트 후원",
+  "support_description": "\n228시간 공들여 만든 도구예요. 편하게 쓰시고 마음에 쏙 드는 포스터 뽑으시길 바랍니다.\n\n결과물이 맘에 드셨다면 커피 한 잔 사주시면 감사하겠습니다. Star 하나만 눌러주셔도 정말 기분 좋아요.",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "신용카드 / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Star 하나만 눌러주세요 🥰 {target}까지 ㄱㄱ!"
 }

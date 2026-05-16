@@ -156,5 +156,13 @@
   "text_display_toggles": "文字表示",
   "toggle_show_city": "都市名",
   "toggle_show_country": "国名",
-  "toggle_show_coords": "座標"
+  "toggle_show_coords": "座標",
+  "support_button": "サポート",
+  "support_title": "このプロジェクトをサポート",
+  "support_description": "\n228時間かけて、こだわりながら作ったツールです。気持ちよく使ってもらえて、いいポスターができたら嬉しいです。\n\nもし気に入ったら、コーヒーでも奢ってもらえると飛び上がって喜びます。Starだけでも、もちろん大歓迎です。",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "クレジットカード / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Starをポチッと🥰目指せ{target}！"
 }

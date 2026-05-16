@@ -6,7 +6,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, GithubIcon, Loader2 } from "lucide-react";
+import { Download, GithubIcon, Heart, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { SupportDialog } from "@/components/support-dialog";
 import { locales } from "@/paraglide/runtime";
 type AvailableLanguageTag = (typeof locales)[number];
 import * as m from "@/paraglide/messages";
@@ -37,6 +39,19 @@ export function AppHeader({
   isGenerating,
   locationLoading,
 }: AppHeaderProps) {
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [starTarget, setStarTarget] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("https://api.github.com/repos/ianho7/maptoposter-online")
+      .then((res) => res.json())
+      .then((data) => {
+        const count: number = data.stargazers_count ?? 0;
+        setStarTarget(Math.ceil((count + 1) / 100) * 100);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="shrink-0 bg-background">
       <div className="mx-0 md:mx-20 px-4 py-4 flex items-center">
@@ -84,16 +99,28 @@ export function AppHeader({
             </span>
           </Button>
           <Button
+            onClick={() => setSupportOpen(true)}
+            className="gap-1 sm:gap-2 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+            aria-label="Open support dialog"
+            data-ai-action="open-support-dialog"
+          >
+            <Heart className="w-4 h-4" aria-hidden="true" />
+            <span className="hidden sm:inline">{m.support_button()}</span>
+          </Button>
+          <Button
             onClick={() => window.open("https://github.com/ianho7/maptoposter-online", "_blank")}
             className="gap-1 sm:gap-2 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
             aria-label="Open GitHub repository in new tab"
             data-ai-action="open-github"
           >
             <GithubIcon className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Github</span>
+            <span className="hidden sm:inline">
+              {starTarget ? m.star_hint({ target: starTarget }) : "Github"}
+            </span>
           </Button>
         </div>
       </div>
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </header>
   );
 }

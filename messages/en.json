@@ -156,5 +156,13 @@
   "text_display_toggles": "Text Display",
   "toggle_show_city": "City Name",
   "toggle_show_country": "Country Name",
-  "toggle_show_coords": "Coordinates"
+  "toggle_show_coords": "Coordinates",
+  "support_button": "Support",
+  "support_title": "Support This Project",
+  "support_description": "\n228 hours went into this little tool. Hope it's been a good ride and your posters turn out great.\n\nIf it made something you're proud of, maybe toss a coffee my way — or just leave a Star. That's plenty.",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "Credit Card / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Drop a Star 🥰 let's hit {target}!"
 }

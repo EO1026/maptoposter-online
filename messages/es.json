@@ -156,5 +156,13 @@
   "text_display_toggles": "Visualización de texto",
   "toggle_show_city": "Nombre de la ciudad",
   "toggle_show_country": "Nombre del país",
-  "toggle_show_coords": "Coordenadas"
+  "toggle_show_coords": "Coordenadas",
+  "support_button": "Apoyar",
+  "support_title": "Apoya este proyecto",
+  "support_description": "\n228 horas de trabajo le metí a esta herramienta. Ojalá te sirva y te queden unos posters de esos que dan orgullo.\n\nSi el resultado te gusta, invítame un café — o déjame una estrella, con eso ya me alegras el día.",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "Tarjeta de crédito / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Déjame una estrella 🥰 ¡vamos por {target}!"
 }

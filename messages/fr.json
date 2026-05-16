@@ -156,5 +156,13 @@
   "text_display_toggles": "Affichage du texte",
   "toggle_show_city": "Nom de la ville",
   "toggle_show_country": "Nom du pays",
-  "toggle_show_coords": "Coordonnées"
+  "toggle_show_coords": "Coordonnées",
+  "support_button": "Soutenir",
+  "support_title": "Soutenir ce projet",
+  "support_description": "\n228 heures de taf pour sortir ce petit outil. J'espère qu'il tourne bien chez vous et que vos posters claquent.\n\nSi le résultat vous plaît, payez-moi un p'tit café — ou lâchez une étoile, ça me fera plaisir aussi.",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "Carte de crédit / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Lâche une étoile 🥰 objectif {target} !"
 }

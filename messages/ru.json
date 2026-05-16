@@ -156,5 +156,13 @@
   "text_display_toggles": "Отображение текста",
   "toggle_show_city": "Название города",
   "toggle_show_country": "Название страны",
-  "toggle_show_coords": "Координаты"
+  "toggle_show_coords": "Координаты",
+  "support_button": "Поддержать",
+  "support_title": "Поддержать проект",
+  "support_description": "\n228 часов ушло на эту штуку. Надеюсь, вам удобно, а постеры выходят — загляденье.\n\nЕсли результат радует — угостите кофе или звёздочку поставьте. Мне будет безумно приятно.",
+  "support_buy_me_a_coffee": "Buy Me a Coffee",
+  "support_buy_me_a_coffee_desc": "Кредитная карта / Apple Pay / Google Pay",
+  "support_afdian": "Afdian (爱发电)",
+  "support_afdian_desc": "WeChat / Alipay",
+  "star_hint": "Поставь звёздочку 🥰 до {target} рукой подать!"
 }
