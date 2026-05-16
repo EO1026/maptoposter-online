@@ -22,6 +22,7 @@ import { LocationSettings } from "./components/location-settings";
 import { DataSettings } from "./components/data-settings";
 import { ThemeColors } from "./components/theme-colors";
 import { FontSettings } from "./components/font-settings";
+import { TextDisplaySettings } from "./components/text-display-settings";
 import { PosterSizeSelector } from "./components/poster-size-selector";
 import { MapPreview } from "./components/map-preview";
 import { GenerationModal } from "./components/generation-modal";
@@ -348,6 +349,11 @@ export default function MapPosterGenerator() {
   const [lodMode, setLodMode] = useState<"simplified" | "detailed">("simplified");
   const [baseRadius, setBaseRadius] = useState(15000);
 
+  // Text display toggle state
+  const [showCoords, setShowCoords] = useState(true);
+  const [showCity, setShowCity] = useState(true);
+  const [showCountry, setShowCountry] = useState(true);
+
   // Initialize language on mount
   useEffect(() => {
     let lang: AvailableLanguageTag;
@@ -401,6 +407,9 @@ export default function MapPosterGenerator() {
       baseRadius,
       selectedSizeId: selectedSize.id,
       location, // Store the lat/lng coordinates too
+      showCoords,
+      showCity,
+      showCountry,
     };
     localStorage.setItem("maptoposter_config", JSON.stringify(config));
   }, [
@@ -412,6 +421,9 @@ export default function MapPosterGenerator() {
     baseRadius,
     selectedSize,
     location,
+    showCoords,
+    showCity,
+    showCountry,
   ]);
 
   useEffect(() => {
@@ -427,6 +439,9 @@ export default function MapPosterGenerator() {
         // Restore LOD & Radius
         if (config.lodMode) setLodMode(config.lodMode);
         if (config.baseRadius) setBaseRadius(config.baseRadius);
+        if (typeof config.showCoords === "boolean") setShowCoords(config.showCoords);
+        if (typeof config.showCity === "boolean") setShowCity(config.showCity);
+        if (typeof config.showCountry === "boolean") setShowCountry(config.showCountry);
 
         // Restore Location Text/Coords
         if (config.customTitle) setCustomTitle(config.customTitle);
@@ -991,6 +1006,9 @@ export default function MapPosterGenerator() {
         frontend_scale: FRONTEND_SCALE,
         road_width_boost: isProtomaps ? 1.8 : 1.0,
         pois: Array.from(poisBin),
+        show_coords: showCoords,
+        show_city: showCity,
+        show_country: showCountry,
       };
       logClientTiming("processing", "prepareRenderConfig", {
         total: performance.now() - configStart,
@@ -1161,6 +1179,15 @@ export default function MapPosterGenerator() {
                 onClearFont={clearCustomFont}
               />
 
+              <TextDisplaySettings
+                showCoords={showCoords}
+                showCity={showCity}
+                showCountry={showCountry}
+                onShowCoordsChange={setShowCoords}
+                onShowCityChange={setShowCity}
+                onShowCountryChange={setShowCountry}
+              />
+
               <PosterSizeSelector
                 sizes={SIZES}
                 selectedSize={selectedSize}
@@ -1175,6 +1202,9 @@ export default function MapPosterGenerator() {
               customFont={customFont}
               baseRadius={baseRadius}
               customTitle={customTitle}
+              showCoords={showCoords}
+              showCity={showCity}
+              showCountry={showCountry}
               previewRef={previewRef}
             />
           </div>

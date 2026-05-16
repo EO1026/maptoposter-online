@@ -253,6 +253,14 @@ pub struct RenderRequest {
     // 道路权重增强倍率（默认 1.0）
     #[serde(default = "default_road_width_boost")]
     pub road_width_boost: f32,
+
+    // 文本显示开关
+    #[serde(default = "default_true")]
+    pub show_coords: bool,
+    #[serde(default = "default_true")]
+    pub show_city: bool,
+    #[serde(default = "default_true")]
+    pub show_country: bool,
 }
 
 pub fn default_road_width_boost() -> f32 {
@@ -265,6 +273,10 @@ pub fn default_selected_size_height() -> u32 {
 
 pub fn default_frontend_scale() -> f32 {
     8.0 // 默认缩放倍数
+}
+
+pub fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize, Serialize)]

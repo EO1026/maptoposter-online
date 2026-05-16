@@ -6,7 +6,7 @@ import { overpassConfig } from "./config";
 import { makeOverpassPolygonCoordStrs, polygonToOverpassCoordStr } from "./geo";
 import { OverpassResponseError, parseResponse } from "./http";
 import { downloadWater } from "./presets";
-import { getOverpassPause, makeOverpassSettings } from "./overpass";
+import { makeOverpassSettings } from "./overpass";
 import { getNetworkFilter } from "./presets";
 
 describe("Config Module", () => {

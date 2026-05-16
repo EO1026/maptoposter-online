@@ -327,12 +327,7 @@ export function ThemeColors({
 
         <TabsContent value="custom" className="mt-3">
           <div className="mb-3 flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyColors}
-              disabled={isImporting}
-            >
+            <Button variant="outline" size="sm" onClick={handleCopyColors} disabled={isImporting}>
               {copied ? m.colors_copied() : m.copy_colors_button()}
             </Button>
             <Button
@@ -344,9 +339,7 @@ export function ThemeColors({
               {isImporting ? m.importing() : m.import_colors_button()}
             </Button>
           </div>
-          {importError ? (
-            <div className="mb-3 text-xs text-red-500">{importError}</div>
-          ) : null}
+          {importError ? <div className="mb-3 text-xs text-red-500">{importError}</div> : null}
           <div className="space-y-4 pr-2 custom-scrollbar pt-1">
             {colorKeys.map(({ key, label }) => (
               <ColorInput

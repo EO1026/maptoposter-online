@@ -98,6 +98,9 @@ pub fn render_map(request_json: &str) -> RenderResult {
         selected_size_height: 3508,
         frontend_scale: 2.0,
         road_width_boost: 1.0,
+        show_coords: true,
+        show_city: true,
+        show_country: true,
     };
 
     render_map_internal(request)
@@ -123,6 +126,13 @@ pub struct BinaryRenderConfig {
     // POI 数据（可选）
     #[serde(default)]
     pub pois: Option<Vec<f64>>, // [poi_count, x1, y1, x2, y2, ...]
+    // 文本显示开关
+    #[serde(default = "types::default_true")]
+    pub show_coords: bool,
+    #[serde(default = "types::default_true")]
+    pub show_city: bool,
+    #[serde(default = "types::default_true")]
+    pub show_country: bool,
 }
 
 /// 主渲染函数 (二进制直读版本)
@@ -343,6 +353,9 @@ fn render_map_binary_internal(
         config.center.lat,
         config.center.lon,
         font_data,
+        config.show_city,
+        config.show_country,
+        config.show_coords,
     ) {
         return RenderResult::error(format!("Failed to draw text: {}", e));
     }
@@ -465,6 +478,9 @@ fn render_map_internal(mut request: RenderRequest) -> RenderResult {
         request.center.lat,
         request.center.lon,
         ROBOTO_REGULAR,
+        request.show_city,
+        request.show_country,
+        request.show_coords,
     ) {
         return RenderResult::error(format!("Failed to draw text: {}", e));
     }

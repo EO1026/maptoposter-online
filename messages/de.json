@@ -152,5 +152,9 @@
   "footer_data_source": "Daten von",
   "footer_contributors": "Mitwirkenden",
   "gallery_reset_zoom": "Zoom zurücksetzen",
-  "gallery_zoom_hint": "Scrollen zum Zoomen, Ziehen zum Schwenken"
+  "gallery_zoom_hint": "Scrollen zum Zoomen, Ziehen zum Schwenken",
+  "text_display_toggles": "Textanzeige",
+  "toggle_show_city": "Stadtname",
+  "toggle_show_country": "Landesname",
+  "toggle_show_coords": "Koordinaten"
 }

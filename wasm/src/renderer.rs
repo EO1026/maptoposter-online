@@ -857,6 +857,9 @@ impl MapRenderer {
         lat: f64,
         lon: f64,
         font_data: &[u8],
+        show_city: bool,
+        show_country: bool,
+        show_coords: bool,
     ) -> Result<(), String> {
         let font = Font::from_bytes(font_data, FontSettings::default())
             .map_err(|e| format!("Failed to load font: {}", e))?;
@@ -899,44 +902,36 @@ impl MapRenderer {
         let base_y_px = base_y_px - padding_offset;
 
         // 定义相对偏移量 (基于 800px 宽度的标准像素值)
-        // 之前的 0.05 (5%) 在 1000px 高度下是 50px
-        // 之前的 0.04 (4%) 在 1000px 高度下是 40px
-        // 之前的 0.03 (3%) 在 1000px 高度下是 30px
-        let city_offset = 50.0 * scale_factor;
-        let coords_offset = -40.0 * scale_factor;
-        // let decor_offset = 30.0 * scale_factor;
+        // 偏移池按从最显眼（顶部）到最不显眼（底部）排列
+        // 可见元素按 city → country → coords 优先级依次取偏移
+        let offset_pool: [f32; 3] = [50.0 * scale_factor, 0.0, -40.0 * scale_factor];
+        let mut visible_items: Vec<(&str, String, f32)> = Vec::new();
 
-        // 绘制城市名 (增加基准大小到 80.0)
-        let formatted_city = format_city_name(city);
-        // 字号阈值
-        let threshold = 30;
-        let city_size = calculate_font_size(&formatted_city, 80.0 * scale_factor, threshold);
-        // 位置：锚点 + 偏移
-        self.draw_text_centered(
-            &font,
-            &formatted_city,
-            base_y_px + city_offset,
-            city_size,
-            text_color,
-        );
+        if show_city {
+            let formatted_city = format_city_name(city);
+            let city_size = calculate_font_size(&formatted_city, 80.0 * scale_factor, 30);
+            visible_items.push(("city", formatted_city, city_size));
+        }
+        if show_country {
+            let country_upper = country.to_uppercase();
+            let country_size = 28.0 * scale_factor;
+            visible_items.push(("country", country_upper, country_size));
+        }
+        if show_coords {
+            let coords_str = format_coordinates(lat, lon);
+            let coords_size = 18.0 * scale_factor;
+            visible_items.push(("coords", coords_str, coords_size));
+        }
 
-        // 绘制国家名 (增加基准大小到 28.0)
-        let country_upper = country.to_uppercase();
-        let country_size = 28.0 * scale_factor;
-        // 位置：锚点本身
-        self.draw_text_centered(&font, &country_upper, base_y_px, country_size, text_color);
-
-        // 绘制坐标 (增加基准大小到 18.0)
-        let coords_str = format_coordinates(lat, lon);
-        let coords_size = 18.0 * scale_factor;
-        // 位置：锚点 - 偏移
-        self.draw_text_centered(
-            &font,
-            &coords_str,
-            base_y_px + coords_offset,
-            coords_size,
-            text_color,
-        );
+        for (i, (_kind, text, font_size)) in visible_items.iter().enumerate() {
+            self.draw_text_centered(
+                &font,
+                text,
+                base_y_px + offset_pool[i],
+                *font_size,
+                text_color,
+            );
+        }
 
         // 绘制装饰线
         // self.draw_decoration_line(text_color, scale_factor, base_y_px + decor_offset);

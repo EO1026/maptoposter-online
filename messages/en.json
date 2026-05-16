@@ -152,5 +152,9 @@
   "footer_data_source": "Data from",
   "footer_contributors": "contributors",
   "gallery_reset_zoom": "Reset Zoom",
-  "gallery_zoom_hint": "Scroll to zoom, drag to pan"
+  "gallery_zoom_hint": "Scroll to zoom, drag to pan",
+  "text_display_toggles": "Text Display",
+  "toggle_show_city": "City Name",
+  "toggle_show_country": "Country Name",
+  "toggle_show_coords": "Coordinates"
 }

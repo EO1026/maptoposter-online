@@ -326,6 +326,9 @@ interface TextOverlayProps {
   customFontFamily: string;
   containerWidth: number;
   containerHeight: number;
+  showCity?: boolean;
+  showCountry?: boolean;
+  showCoords?: boolean;
 }
 
 function TextOverlay({
@@ -337,6 +340,9 @@ function TextOverlay({
   customFontFamily,
   containerWidth,
   containerHeight,
+  showCity = true,
+  showCountry = true,
+  showCoords = true,
 }: TextOverlayProps) {
   const widthScale = containerWidth / 1200;
   const heightScale = (containerHeight / 1200) * 1.1;
@@ -355,9 +361,16 @@ function TextOverlay({
   const paddingOffset = rootFontSize;
   const anchorY = 0.88;
 
-  const cityY = anchorY * containerHeight + 50 * scaleFactor - paddingOffset;
-  const countryY = anchorY * containerHeight - paddingOffset;
-  const coordsY = anchorY * containerHeight - 40 * scaleFactor - paddingOffset;
+  const offsetPool = [50 * scaleFactor, 0, -40 * scaleFactor];
+  const visibleItems: { label: string; fontSize: number; opacity?: number }[] = [];
+  if (showCity) visibleItems.push({ label: formatCityName(city), fontSize: cityFontSize });
+  if (showCountry) visibleItems.push({ label: country.toUpperCase(), fontSize: countryFontSize });
+  if (showCoords)
+    visibleItems.push({
+      label: formatCoordinates(lat, lon),
+      fontSize: coordsFontSize,
+      opacity: 0.8,
+    });
 
   const baseStyle: React.CSSProperties = {
     position: "absolute",
@@ -373,25 +386,20 @@ function TextOverlay({
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
-      <span style={{ ...baseStyle, top: cityY, fontSize: `${cityFontSize}px`, fontWeight: 400 }}>
-        {formatCityName(city)}
-      </span>
-      <span
-        style={{ ...baseStyle, top: countryY, fontSize: `${countryFontSize}px`, fontWeight: 400 }}
-      >
-        {country.toUpperCase()}
-      </span>
-      <span
-        style={{
-          ...baseStyle,
-          top: coordsY,
-          fontSize: `${coordsFontSize}px`,
-          fontWeight: 400,
-          opacity: 0.8,
-        }}
-      >
-        {formatCoordinates(lat, lon)}
-      </span>
+      {visibleItems.map((item, i) => (
+        <span
+          key={i}
+          style={{
+            ...baseStyle,
+            top: anchorY * containerHeight + offsetPool[i] - paddingOffset,
+            fontSize: `${item.fontSize}px`,
+            fontWeight: 400,
+            ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
+          }}
+        >
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -418,6 +426,9 @@ interface MapPosterPreviewProps {
   customFont?: Uint8Array;
   poiDensity?: "none" | "sparse" | "medium" | "dense";
   gradientColor?: string;
+  showCity?: boolean;
+  showCountry?: boolean;
+  showCoords?: boolean;
 }
 
 export function MapPosterPreview({
@@ -438,6 +449,9 @@ export function MapPosterPreview({
   customFont,
   poiDensity = "medium",
   gradientColor,
+  showCity,
+  showCountry,
+  showCoords,
 }: MapPosterPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -604,6 +618,9 @@ export function MapPosterPreview({
           customFontFamily={fontFamily}
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
+          showCity={showCity}
+          showCountry={showCountry}
+          showCoords={showCoords}
         />
       )}
     </div>

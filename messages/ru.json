@@ -152,5 +152,9 @@
   "footer_data_source": "Данные от",
   "footer_contributors": "участников",
   "gallery_reset_zoom": "Сбросить масштаб",
-  "gallery_zoom_hint": "Прокрутка для увеличения, перетаскивание для перемещения"
+  "gallery_zoom_hint": "Прокрутка для увеличения, перетаскивание для перемещения",
+  "text_display_toggles": "Отображение текста",
+  "toggle_show_city": "Название города",
+  "toggle_show_country": "Название страны",
+  "toggle_show_coords": "Координаты"
 }

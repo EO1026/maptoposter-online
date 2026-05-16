@@ -62,7 +62,11 @@ function formatMs(duration: number): string {
   return `${Math.round(duration)}ms`;
 }
 
-function logTiming(scope: string, name: string, timings: Record<string, number | string | undefined>) {
+function logTiming(
+  scope: string,
+  name: string,
+  timings: Record<string, number | string | undefined>
+) {
   const parts = Object.entries(timings)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${typeof value === "number" ? formatMs(value) : value}`);

@@ -152,5 +152,9 @@
   "footer_data_source": "Données fournies par les",
   "footer_contributors": "contributeurs",
   "gallery_reset_zoom": "Réinitialiser le zoom",
-  "gallery_zoom_hint": "Faites défiler pour zoomer, faites glisser pour déplacer"
+  "gallery_zoom_hint": "Faites défiler pour zoomer, faites glisser pour déplacer",
+  "text_display_toggles": "Affichage du texte",
+  "toggle_show_city": "Nom de la ville",
+  "toggle_show_country": "Nom du pays",
+  "toggle_show_coords": "Coordonnées"
 }

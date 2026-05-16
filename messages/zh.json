@@ -152,5 +152,9 @@
   "footer_data_source": "数据来源",
   "footer_contributors": "贡献者",
   "gallery_reset_zoom": "重置缩放",
-  "gallery_zoom_hint": "滚轮缩放，拖动平移"
+  "gallery_zoom_hint": "滚轮缩放，拖动平移",
+  "text_display_toggles": "文字显示",
+  "toggle_show_city": "城市名称",
+  "toggle_show_country": "国家名称",
+  "toggle_show_coords": "经纬度坐标"
 }

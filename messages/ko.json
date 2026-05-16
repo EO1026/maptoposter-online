@@ -152,5 +152,9 @@
   "footer_data_source": "데이터 제공:",
   "footer_contributors": "기여자",
   "gallery_reset_zoom": "확대/축소 초기화",
-  "gallery_zoom_hint": "스크롤하여 확대/축소, 드래그하여 이동"
+  "gallery_zoom_hint": "스크롤하여 확대/축소, 드래그하여 이동",
+  "text_display_toggles": "텍스트 표시",
+  "toggle_show_city": "도시 이름",
+  "toggle_show_country": "국가 이름",
+  "toggle_show_coords": "좌표"
 }

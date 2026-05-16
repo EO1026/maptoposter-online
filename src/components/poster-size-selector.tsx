@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { type PosterSize } from "@/components/artistic-map";
 import { cn } from "@/lib/utils";
 import * as m from "@/paraglide/messages";
+import { Scaling } from "lucide-react";
 
 interface LocalPosterSize extends PosterSize {
   icon: React.ReactNode;
@@ -16,7 +17,10 @@ interface PosterSizeSelectorProps {
 export function PosterSizeSelector({ sizes, selectedSize, onSizeChange }: PosterSizeSelectorProps) {
   return (
     <Card className="p-4 bg-card border-border">
-      <h2 className="text-lg text-foreground mb-4">{m.poster_size()}</h2>
+      <div className="flex items-center gap-2">
+        <Scaling className="w-4 h-4 text-primary" />
+        <h2 className="text-lg text-foreground">{m.poster_size()}</h2>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         {sizes.map((size) => (
           <button

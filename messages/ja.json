@@ -152,5 +152,9 @@
   "footer_data_source": "データ提供:",
   "footer_contributors": "貢献者",
   "gallery_reset_zoom": "ズームをリセット",
-  "gallery_zoom_hint": "スクロールでズーム、ドラッグでパン"
+  "gallery_zoom_hint": "スクロールでズーム、ドラッグでパン",
+  "text_display_toggles": "文字表示",
+  "toggle_show_city": "都市名",
+  "toggle_show_country": "国名",
+  "toggle_show_coords": "座標"
 }

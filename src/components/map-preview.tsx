@@ -25,6 +25,9 @@ interface MapPreviewProps {
   customFont: Uint8Array | null;
   baseRadius: number;
   customTitle: string;
+  showCoords: boolean;
+  showCity: boolean;
+  showCountry: boolean;
   previewRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -35,6 +38,9 @@ export function MapPreview({
   customFont,
   baseRadius,
   customTitle,
+  showCoords,
+  showCity,
+  showCountry,
   previewRef,
 }: MapPreviewProps) {
   const previewTheme = useMemo(
@@ -107,6 +113,9 @@ export function MapPreview({
             customFont={customFont || undefined}
             className="w-full h-full"
             roadWidthMultiplier={1}
+            showCity={showCity}
+            showCountry={showCountry}
+            showCoords={showCoords}
           />
         </div>
       </div>
