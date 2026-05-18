@@ -110,13 +110,16 @@ function createMapDataCacheKey(
   city: string,
   baseRadius: number,
   lodMode: "simplified" | "detailed",
-  type: string
+  type: string,
+  district?: string
 ) {
-  return `map_data:${MAP_DATA_CACHE_VERSION}:${country}:${city}:${baseRadius}:${lodMode}:${type}`;
+  const d = district && district !== city ? `:${district}` : "";
+  return `map_data:${MAP_DATA_CACHE_VERSION}:${country}:${city}${d}:${baseRadius}:${lodMode}:${type}`;
 }
 
-function createPOIsCacheKey(country: string, city: string, baseRadius: number) {
-  return `map_data:${MAP_DATA_CACHE_VERSION}:${country}:${city}:${baseRadius}:pois`;
+function createPOIsCacheKey(country: string, city: string, baseRadius: number, district?: string) {
+  const d = district && district !== city ? `:${district}` : "";
+  return `map_data:${MAP_DATA_CACHE_VERSION}:${country}:${city}${d}:${baseRadius}:pois`;
 }
 
 type MapDataType = "roads" | "water" | "parks" | "pois";
@@ -126,13 +129,14 @@ function createCacheKey(
   city: string,
   baseRadius: number,
   lodMode: "simplified" | "detailed",
-  type: MapDataType
+  type: MapDataType,
+  district?: string
 ) {
   if (type === "pois") {
-    return createPOIsCacheKey(country, city, baseRadius);
+    return createPOIsCacheKey(country, city, baseRadius, district);
   }
 
-  return createMapDataCacheKey(country, city, baseRadius, lodMode, type);
+  return createMapDataCacheKey(country, city, baseRadius, lodMode, type, district);
 }
 
 async function restoreCachedType(
@@ -237,11 +241,12 @@ async function saveFetchedType(
   baseRadius: number,
   lodMode: "simplified" | "detailed",
   type: MapDataType,
-  data: GeoJSON.FeatureCollection
+  data: GeoJSON.FeatureCollection,
+  district?: string
 ) {
   const json = JSON.stringify(data);
   const compressed = await compress(json);
-  const key = createCacheKey(country, city, baseRadius, lodMode, type);
+  const key = createCacheKey(country, city, baseRadius, lodMode, type, district);
   await db.put(STORE_NAME, compressed, key);
 }
 
@@ -250,7 +255,7 @@ self.onmessage = async (event: MessageEvent) => {
 
   try {
     if (type === "GET_MAP_DATA") {
-      const { country, city, lat, lng, baseRadius, lodMode } = payload;
+      const { country, city, lat, lng, baseRadius, lodMode, district } = payload;
       const db = await getDB();
       sendProgress(11, "step_cache_checking");
       const fetchViewportBbox = buildCanonicalFetchViewportBbox({
@@ -274,7 +279,7 @@ self.onmessage = async (event: MessageEvent) => {
       const missingTypes = new Set<MapDataType>();
 
       for (const mapType of types) {
-        const key = createCacheKey(country, city, baseRadius, lodMode, mapType);
+        const key = createCacheKey(country, city, baseRadius, lodMode, mapType, district);
         const blob = await db.get(STORE_NAME, key);
         if (blob) {
           cachedBlobs[mapType] = blob;
@@ -284,7 +289,9 @@ self.onmessage = async (event: MessageEvent) => {
       }
 
       if (missingTypes.size === 0) {
-        console.log(`[DataWorker] Cache Hit: ${city}, ${country} (LOD: ${lodMode}) + POIs`);
+        console.log(
+          `[DataWorker] Cache Hit: ${city}, ${country}${district ? ` > ${district}` : ""} (LOD: ${lodMode}) + POIs`
+        );
         sendProgress(14, "step_cache_hit");
         const cacheRestoreStart = performance.now();
         const restoreContext = {
@@ -293,7 +300,7 @@ self.onmessage = async (event: MessageEvent) => {
           baseRadius,
           fetchViewportBbox,
           saveMergedWater: (data: GeoJSON.FeatureCollection) =>
-            saveFetchedType(db, country, city, baseRadius, lodMode, "water", data),
+            saveFetchedType(db, country, city, baseRadius, lodMode, "water", data, district),
         };
         const restorePlan: Array<{ type: MapDataType; start: number; span: number }> = [
           { type: "roads", start: 16, span: 10 },
@@ -327,7 +334,7 @@ self.onmessage = async (event: MessageEvent) => {
               baseRadius,
               fetchViewportBbox,
               saveMergedWater: (data: GeoJSON.FeatureCollection) =>
-                saveFetchedType(db, country, city, baseRadius, lodMode, "water", data),
+                saveFetchedType(db, country, city, baseRadius, lodMode, "water", data, district),
             });
             results[mapType] = restored as any;
           }
@@ -340,14 +347,25 @@ self.onmessage = async (event: MessageEvent) => {
         let poisGeo: GeoJSON.FeatureCollection | null = null;
 
         if (USE_PROTOMAPS) {
-          console.log(`[DataWorker] Cache Miss: ${city}. Fetching from Protomaps...`);
+          console.log(
+            `[DataWorker] Cache Miss: ${city}${district ? ` > ${district}` : ""}. Fetching from Protomaps...`
+          );
           sendProgress(5, "step_fetching_data");
           const protomapsData = await fetchFromProtomaps([lat, lng], fetchRadius);
           if (!protomapsData) throw new Error("Failed to fetch data from Protomaps");
           if (missingTypes.has("roads")) {
             roadsGeo = protomapsData.roads;
             results.roads = flattenRoadsGeoJSON(roadsGeo) as any;
-            await saveFetchedType(db, country, city, baseRadius, lodMode, "roads", roadsGeo);
+            await saveFetchedType(
+              db,
+              country,
+              city,
+              baseRadius,
+              lodMode,
+              "roads",
+              roadsGeo,
+              district
+            );
           }
           if (missingTypes.has("water")) {
             waterGeo = protomapsData.water;
@@ -358,17 +376,44 @@ self.onmessage = async (event: MessageEvent) => {
               viewportBbox: fetchViewportBbox,
             });
             results.water = flattenPolygonsGeoJSON(mergedWaterGeo) as any;
-            await saveFetchedType(db, country, city, baseRadius, lodMode, "water", mergedWaterGeo);
+            await saveFetchedType(
+              db,
+              country,
+              city,
+              baseRadius,
+              lodMode,
+              "water",
+              mergedWaterGeo,
+              district
+            );
           }
           if (missingTypes.has("parks")) {
             parksGeo = protomapsData.landuse;
             results.parks = flattenPolygonsGeoJSON(parksGeo) as any;
-            await saveFetchedType(db, country, city, baseRadius, lodMode, "parks", parksGeo);
+            await saveFetchedType(
+              db,
+              country,
+              city,
+              baseRadius,
+              lodMode,
+              "parks",
+              parksGeo,
+              district
+            );
           }
           if (missingTypes.has("pois")) {
             poisGeo = protomapsData.pois;
             results.pois = flattenPOIsGeometry(poisGeo) as any;
-            await saveFetchedType(db, country, city, baseRadius, lodMode, "pois", poisGeo);
+            await saveFetchedType(
+              db,
+              country,
+              city,
+              baseRadius,
+              lodMode,
+              "pois",
+              poisGeo,
+              district
+            );
           }
         } else if (USE_OVERPASS_CLIENT) {
           // [新库] 使用 overpass-client (串行请求，避免触发服务器并发限制)
@@ -387,7 +432,16 @@ self.onmessage = async (event: MessageEvent) => {
             );
             if (roadsGeo) {
               results.roads = flattenRoadsGeoJSON(roadsGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "roads", roadsGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "roads",
+                roadsGeo,
+                district
+              );
             }
           }
 
@@ -414,7 +468,8 @@ self.onmessage = async (event: MessageEvent) => {
                 baseRadius,
                 lodMode,
                 "water",
-                mergedWaterGeo
+                mergedWaterGeo,
+                district
               );
             }
           }
@@ -429,7 +484,16 @@ self.onmessage = async (event: MessageEvent) => {
             );
             if (parksGeo) {
               results.parks = flattenPolygonsGeoJSON(parksGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "parks", parksGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "parks",
+                parksGeo,
+                district
+              );
             }
           }
 
@@ -444,7 +508,16 @@ self.onmessage = async (event: MessageEvent) => {
             );
             if (poisGeo) {
               results.pois = flattenPOIsGeometry(poisGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "pois", poisGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "pois",
+                poisGeo,
+                district
+              );
             }
           }
 
@@ -459,7 +532,16 @@ self.onmessage = async (event: MessageEvent) => {
             roadsGeo = await fetchGraph([lat, lng], fetchRadius, lodMode);
             if (roadsGeo) {
               results.roads = flattenRoadsGeoJSON(roadsGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "roads", roadsGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "roads",
+                roadsGeo,
+                district
+              );
             }
           }
 
@@ -490,7 +572,8 @@ self.onmessage = async (event: MessageEvent) => {
                 baseRadius,
                 lodMode,
                 "water",
-                mergedWaterGeo
+                mergedWaterGeo,
+                district
               );
             }
           }
@@ -509,7 +592,16 @@ self.onmessage = async (event: MessageEvent) => {
             );
             if (parksGeo) {
               results.parks = flattenPolygonsGeoJSON(parksGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "parks", parksGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "parks",
+                parksGeo,
+                district
+              );
             }
           }
 
@@ -519,7 +611,16 @@ self.onmessage = async (event: MessageEvent) => {
             poisGeo = await fetchPOIs([lat, lng], fetchRadius);
             if (poisGeo) {
               results.pois = flattenPOIsGeometry(poisGeo) as any;
-              await saveFetchedType(db, country, city, baseRadius, lodMode, "pois", poisGeo);
+              await saveFetchedType(
+                db,
+                country,
+                city,
+                baseRadius,
+                lodMode,
+                "pois",
+                poisGeo,
+                district
+              );
             }
           }
 

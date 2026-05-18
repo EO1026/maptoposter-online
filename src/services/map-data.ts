@@ -59,19 +59,28 @@ class MapDataService {
     this.progressCallback = callback;
   }
 
+  /**
+   * 获取地图数据（内存缓存 → Worker → IndexedDB → 网络）
+   * @param district 区/县级行政区，仅当与 city 不同时才会影响缓存 key（兼容旧缓存）
+   */
   async getMapData(
     country: string,
     city: string,
     lat: number,
     lng: number,
     baseRadius: number,
-    lodMode: "simplified" | "detailed" = "simplified"
+    lodMode: "simplified" | "detailed" = "simplified",
+    district?: string
   ): Promise<MapData> {
-    const cacheKey = `${MAP_DATA_CACHE_VERSION}:${country}:${city}:${baseRadius}:${lodMode}`;
+    // district 不等于 city 时才加入 key，保证城市级缓存仍可命中旧数据
+    const districtPart = district && district !== city ? `:${district}` : "";
+    const cacheKey = `${MAP_DATA_CACHE_VERSION}:${country}:${city}${districtPart}:${baseRadius}:${lodMode}`;
 
     // 1. 尝试 L1 内存缓存
     if (this.memoryCache.has(cacheKey)) {
-      console.log(`[MapDataService] L1 Memory Hit: ${city} (LOD: ${lodMode})`);
+      console.log(
+        `[MapDataService] L1 Memory Hit: ${city}${district ? ` > ${district}` : ""} (LOD: ${lodMode})`
+      );
       const cached = this.memoryCache.get(cacheKey)!;
       // 重要：返回副本，防止缓存的 Buffer 在 postMessage 中被 Detached
       return {
@@ -96,7 +105,7 @@ class MapDataService {
     this.worker.postMessage({
       id,
       type: "GET_MAP_DATA",
-      payload: { country, city, lat, lng, baseRadius, lodMode },
+      payload: { country, city, lat, lng, baseRadius, lodMode, district },
     });
 
     const result = await promise;
@@ -123,10 +132,10 @@ class MapDataService {
     city: string,
     lat: number,
     lng: number,
-    radius: number
+    radius: number,
+    district?: string
   ): Promise<POIData> {
-    // 直接调用 getMapData，获取其中的 pois
-    const mapData = await this.getMapData(country, city, lat, lng, radius, "simplified");
+    const mapData = await this.getMapData(country, city, lat, lng, radius, "simplified", district);
     return {
       pois: mapData.pois,
       fromCache: mapData.fromCache,

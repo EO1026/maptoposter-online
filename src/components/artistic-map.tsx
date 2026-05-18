@@ -423,7 +423,8 @@ interface MapPosterPreviewProps {
   onMoveEnd?: (location: MapLocation) => void;
   roadWidthMultiplier?: number;
   posterSize?: PosterSize;
-  customFont?: Uint8Array;
+  fontCacheRef: React.RefObject<Map<string, { data: Uint8Array; fileName: string }> | null>;
+  selectedPreset: string;
   poiDensity?: "none" | "sparse" | "medium" | "dense";
   gradientColor?: string;
   showCity?: boolean;
@@ -446,7 +447,8 @@ export function MapPosterPreview({
   onMoveEnd,
   roadWidthMultiplier = 1,
   posterSize,
-  customFont,
+  fontCacheRef,
+  selectedPreset,
   poiDensity = "medium",
   gradientColor,
   showCity,
@@ -459,25 +461,28 @@ export function MapPosterPreview({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState<string>("sans-serif");
 
-  // 加载自定义字体
+  // 通过 Object URL + CSS @font-face 加载字体，避免主线程 OTF 解析
+  // 从 fontCacheRef 读取数据，不经过 React prop，避免 DevTools clone 大 Uint8Array
   useEffect(() => {
-    if (!customFont) {
+    const fontData = fontCacheRef.current?.get(selectedPreset)?.data;
+    if (!fontData) {
       setFontFamily("sans-serif");
       return;
     }
-    const loadFont = async () => {
-      try {
-        const fontFace = new FontFace("CustomFont", customFont.slice(0).buffer);
-        await fontFace.load();
-        document.fonts.add(fontFace);
-        setFontFamily("CustomFont");
-      } catch (err) {
-        console.warn("Failed to load custom font:", err);
-        setFontFamily("sans-serif");
-      }
+
+    const blob = new Blob([fontData as BlobPart], { type: "font/otf" });
+    const objectUrl = URL.createObjectURL(blob);
+    const style = document.createElement("style");
+    style.textContent = `@font-face { font-family: "CustomFont"; src: url("${objectUrl}"); }`;
+    document.head.appendChild(style);
+    setFontFamily("CustomFont");
+
+    return () => {
+      document.head.removeChild(style);
+      URL.revokeObjectURL(objectUrl);
+      setFontFamily("sans-serif");
     };
-    loadFont();
-  }, [customFont]);
+  }, [fontCacheRef, selectedPreset]);
 
   // 监听容器尺寸变化
   useEffect(() => {

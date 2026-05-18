@@ -22,7 +22,8 @@ interface MapPreviewProps {
   location: Location;
   selectedSize: PosterSize;
   colors: MapColors;
-  customFont: Uint8Array | null;
+  fontCacheRef: React.RefObject<Map<string, { data: Uint8Array; fileName: string }> | null>;
+  selectedPreset: string;
   baseRadius: number;
   customTitle: string;
   showCoords: boolean;
@@ -35,7 +36,8 @@ export function MapPreview({
   location,
   selectedSize,
   colors,
-  customFont,
+  fontCacheRef,
+  selectedPreset,
   baseRadius,
   customTitle,
   showCoords,
@@ -101,7 +103,9 @@ export function MapPreview({
         >
           <MapPosterPreview
             location={{ lat: location.lat || 0, lon: location.lng || 0 }}
-            city={customTitle || location.city.toUpperCase() || ""}
+            city={
+              customTitle || location.district?.toUpperCase() || location.city.toUpperCase() || ""
+            }
             country={location.country || ""}
             zoom={12}
             radius={baseRadius}
@@ -110,7 +114,8 @@ export function MapPreview({
             textColor={colors.text}
             gradientColor={colors.gradient_color}
             posterSize={selectedSize}
-            customFont={customFont || undefined}
+            fontCacheRef={fontCacheRef}
+            selectedPreset={selectedPreset}
             className="w-full h-full"
             roadWidthMultiplier={1}
             showCity={showCity}

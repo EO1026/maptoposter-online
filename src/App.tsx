@@ -1,6 +1,17 @@
-import { useState, useRef, useEffect, useDeferredValue } from "react";
+import { useState, useRef, useEffect, useDeferredValue, useCallback, useMemo } from "react";
 import { type PosterSize } from "@/components/artistic-map";
-import { Square, Smartphone, Monitor, FileImage } from "lucide-react";
+import {
+  Square,
+  Smartphone,
+  Monitor,
+  FileImage,
+  MapPin,
+  Settings2,
+  Palette,
+  Type,
+  FileText,
+  Scaling,
+} from "lucide-react";
 import { useLocationData } from "@/hooks/useLocationData";
 import { getUserGeolocation } from "@/services/ip-geolocation";
 
@@ -9,13 +20,14 @@ import init, { init_panic_hook } from "./pkg/wasm";
 import { shardRoadsBinary } from "./utils";
 import { type MapColors, MAP_THEMES as THEMES, type Location } from "@/lib/types";
 import { mapDataService } from "./services/map-data";
-import { type State, type City } from "@/services/location-types";
+import { type State, type City, type District } from "@/services/location-types";
 // Paraglide i18n
 import * as m from "@/paraglide/messages";
 import { getLocale, setLocale, locales } from "@/paraglide/runtime";
 import { useDynamicFont } from "./hooks/useDynamicFont";
 import { PosterGallery } from "./components/gallery";
 import Footer from "./components/footer";
+import { ConfigNav, type NavSection } from "./components/config-nav";
 import { SEOHead } from "./hooks/useSEO";
 import { AppHeader } from "./components/app-header";
 import { LocationSettings } from "./components/location-settings";
@@ -184,11 +196,17 @@ function namesReferToSameLocation(first: string, second: string): boolean {
   );
 }
 
+const fontMap: Record<string, string> = {
+  LXGW_Neo_ZhiSong: "/font/LXGWNeoZhiSong.ttf",
+  fraunces: "/font/Fraunces_72pt-Regular.ttf",
+};
+
 export default function MapPosterGenerator() {
   const {
     countries,
     getStatesByCountry,
     getCitiesByState,
+    getDistrictsByCity,
     isLoading: locationLoading,
   } = useLocationData();
 
@@ -294,14 +312,17 @@ export default function MapPosterGenerator() {
     "Glitch-Purple": m.theme_glitch_purple(),
   };
 
-  // Location selection state
+  // 地点选择状态（国 → 省 → 市 → 区 四级联动）
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<string>("");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(""); // 区/县/郡，通过 Overpass API 动态获取
   const [states, setStates] = useState<State[]>([]);
   const [cities, setCities] = useState<City[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]); // 始终包含城市自身作为首选项（id=0）
   const [isStatesLoading, setIsStatesLoading] = useState(false);
   const [isCitiesLoading, setIsCitiesLoading] = useState(false);
+  const [isDistrictsLoading, setIsDistrictsLoading] = useState(false);
 
   const resolveStandaloneRegionFallback = async (
     countryName: string,
@@ -344,6 +365,8 @@ export default function MapPosterGenerator() {
   const [customFont, setCustomFont] = useState<Uint8Array | null>(null);
   const [fontFileName, setFontFileName] = useState<string>("");
   const fontFileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedPreset, setSelectedPreset] = useState<string>("default");
+  const [fontLoadingPreset, setFontLoadingPreset] = useState<string | null>(null);
 
   // Data settings state
   const [lodMode, setLodMode] = useState<"simplified" | "detailed">("simplified");
@@ -353,6 +376,38 @@ export default function MapPosterGenerator() {
   const [showCoords, setShowCoords] = useState(true);
   const [showCity, setShowCity] = useState(true);
   const [showCountry, setShowCountry] = useState(true);
+
+  // Config navigation state
+  const configScrollRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState("section-location");
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const isNavScrollingRef = useRef(false);
+
+  const setSectionRef = useCallback(
+    (id: string) => (el: HTMLElement | null) => {
+      if (el) {
+        sectionRefs.current.set(id, el);
+      } else {
+        sectionRefs.current.delete(id);
+      }
+    },
+    []
+  );
+
+  const handleNavNavigate = useCallback((sectionId: string) => {
+    isNavScrollingRef.current = true;
+    setActiveSection(sectionId);
+    const el = sectionRefs.current.get(sectionId);
+    const container = configScrollRef.current;
+    if (el && container) {
+      requestAnimationFrame(() => {
+        const containerRect = container.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const scrollTop = container.scrollTop + elRect.top - containerRect.top;
+        container.scrollTo({ top: scrollTop, behavior: "smooth" });
+      });
+    }
+  }, []);
 
   // Initialize language on mount
   useEffect(() => {
@@ -402,6 +457,7 @@ export default function MapPosterGenerator() {
       selectedCountry,
       selectedState,
       selectedCity,
+      selectedDistrict,
       customTitle,
       lodMode,
       baseRadius,
@@ -416,6 +472,7 @@ export default function MapPosterGenerator() {
     selectedCountry,
     selectedState,
     selectedCity,
+    selectedDistrict,
     customTitle,
     lodMode,
     baseRadius,
@@ -481,10 +538,32 @@ export default function MapPosterGenerator() {
 
                     setSelectedCity(resolvedCityName);
 
+                    // 恢复区选择：先设城市为 fallback，再异步拉 API 结果合并
+                    setSelectedDistrict(config.selectedDistrict || resolvedCityName);
+                    const cityAsDistrict: District = {
+                      id: 0,
+                      name: resolvedCityName,
+                      lat: resolvedCoordinates.lat,
+                      lng: resolvedCoordinates.lng,
+                    };
+                    setIsDistrictsLoading(true);
+                    try {
+                      const apiDistricts = await getDistrictsByCity(
+                        resolvedCityName,
+                        config.selectedState,
+                        config.selectedCountry
+                      );
+                      setDistricts([cityAsDistrict, ...apiDistricts]);
+                    } catch {
+                      setDistricts([cityAsDistrict]);
+                    }
+                    setIsDistrictsLoading(false);
+
                     setLocation({
                       country: config.selectedCountry,
                       state: config.selectedState,
                       city: resolvedCityName,
+                      district: config.selectedDistrict || resolvedCityName,
                       lat: resolvedCoordinates.lat,
                       lng: resolvedCoordinates.lng,
                     });
@@ -577,10 +656,25 @@ export default function MapPosterGenerator() {
                         parseFloat(String(geo.longitude)) ||
                         0;
 
+                  // IP 定位成功后拉取区列表（城市自身 + API 数据）
+                  setSelectedDistrict(city.name);
+                  setDistricts([{ id: 0, name: city.name, lat, lng }]);
+                  try {
+                    const apiDistricts = await getDistrictsByCity(
+                      city.name as string,
+                      state.name,
+                      country.name
+                    );
+                    setDistricts([{ id: 0, name: city.name, lat, lng }, ...apiDistricts]);
+                  } catch {
+                    /* 失败则仅保留城市自身选项 */
+                  }
+
                   setLocation({
                     country: country.name,
                     state: state.name,
                     city: city.name,
+                    district: city.name,
                     lat,
                     lng,
                   });
@@ -629,10 +723,24 @@ export default function MapPosterGenerator() {
                       : parseFloat(firstCity.longitude as string) || 0;
                 }
 
+                setSelectedDistrict(cityName);
+                const cityDistrict: District = { id: 0, name: cityName, lat, lng };
+                try {
+                  const apiDistricts = await getDistrictsByCity(
+                    cityName,
+                    firstState.name,
+                    firstCountry.name
+                  );
+                  setDistricts([cityDistrict, ...apiDistricts]);
+                } catch {
+                  setDistricts([cityDistrict]);
+                }
+
                 setLocation({
                   country: firstCountry.name,
                   state: firstState.name,
                   city: cityName,
+                  district: cityName,
                   lat,
                   lng,
                 });
@@ -650,17 +758,89 @@ export default function MapPosterGenerator() {
     }
   }, [countries]);
 
+  const prefetchFonts = useCallback(async () => {
+    for (const [preset, url] of Object.entries(fontMap)) {
+      if (fontCacheRef.current.has(preset)) continue;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const fontData = new Uint8Array(await res.arrayBuffer());
+        const fileName = url.split("/").pop() || "";
+        fontCacheRef.current.set(preset, { data: fontData, fileName });
+      } catch {
+        /* 静默失败，prefetch 不影响主流程 */
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    prefetchFonts();
+  }, []);
+
+  // IntersectionObserver: track which config section is most visible
+  const ioRatiosRef = useRef<Map<Element, number>>(new Map());
+
+  useEffect(() => {
+    const scrollContainer = configScrollRef.current;
+    if (!scrollContainer) return;
+
+    const onUserScroll = () => {
+      isNavScrollingRef.current = false;
+    };
+    scrollContainer.addEventListener("wheel", onUserScroll, { passive: true });
+    scrollContainer.addEventListener("touchstart", onUserScroll, { passive: true });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isNavScrollingRef.current) return;
+        for (const entry of entries) {
+          ioRatiosRef.current.set(entry.target, entry.intersectionRatio);
+        }
+        let bestId: string | null = null;
+        let bestRatio = 0;
+        for (const [el, ratio] of ioRatiosRef.current) {
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestId = el.id;
+          }
+        }
+        if (bestId) {
+          setActiveSection(bestId);
+        }
+      },
+      {
+        root: scrollContainer,
+        threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+      }
+    );
+
+    // 初始化 ratio 表
+    for (const el of sectionRefs.current.values()) {
+      ioRatiosRef.current.set(el, 0);
+      observer.observe(el);
+    }
+
+    return () => {
+      scrollContainer.removeEventListener("wheel", onUserScroll);
+      scrollContainer.removeEventListener("touchstart", onUserScroll);
+      observer.disconnect();
+    };
+  }, []);
+
   // Remove the old initialization useEffect (lines 182-211) as it's merged above
 
   const deferredCustomColors = useDeferredValue(customColors);
+  const deferredSelectedPreset = useDeferredValue(selectedPreset);
   const colors = useCustomColors ? deferredCustomColors : selectedTheme.colors;
 
   const handleCountryChange = async (countryName: string) => {
     setSelectedCountry(countryName);
     setStates([]);
     setCities([]);
+    setDistricts([]);
     setIsStatesLoading(true);
     setIsCitiesLoading(true);
+    setIsDistrictsLoading(true);
     try {
       const country = countries.find((c) => c.name.toLowerCase() === countryName.toLowerCase());
       const countryStates = await getStatesByCountry(country?.id || 0);
@@ -691,10 +871,26 @@ export default function MapPosterGenerator() {
                 : parseFloat(firstCity.longitude as string) || 0;
           }
 
+          // 区列表：城市自身作为默认 fallback + API 获取的区县数据
+          setSelectedDistrict(cityName);
+          const cityAsDistrict: District = { id: 0, name: cityName, lat, lng };
+          try {
+            const apiDistricts = await getDistrictsByCity(
+              cityName,
+              firstState.name,
+              country?.name || countryName
+            );
+            setDistricts([cityAsDistrict, ...apiDistricts]);
+          } catch {
+            setDistricts([cityAsDistrict]);
+          }
+          setIsDistrictsLoading(false);
+
           setLocation({
             country: country?.name || countryName,
             state: firstState.name,
             city: cityName,
+            district: cityName,
             lat,
             lng,
           });
@@ -703,8 +899,11 @@ export default function MapPosterGenerator() {
         // 没有州/省份数据（如澳门），使用国家名作为城市名
         setSelectedState("");
         setSelectedCity("");
+        setSelectedDistrict("");
         setCities([]);
+        setDistricts([]);
         setIsCitiesLoading(false);
+        setIsDistrictsLoading(false);
         const cityName = countryName;
         // 无法获取坐标，仅设置地区名称
         setLocation({ country: countryName, state: "", city: cityName });
@@ -713,13 +912,16 @@ export default function MapPosterGenerator() {
       console.error("Error loading states:", error);
       setIsStatesLoading(false);
       setIsCitiesLoading(false);
+      setIsDistrictsLoading(false);
     }
   };
 
   const handleStateChange = async (stateName: string) => {
     setSelectedState(stateName);
     setCities([]);
+    setDistricts([]);
     setIsCitiesLoading(true);
+    setIsDistrictsLoading(true);
     try {
       const state = states.find((s) => s.name.toLowerCase() === stateName.toLowerCase());
       if (state) {
@@ -745,22 +947,39 @@ export default function MapPosterGenerator() {
                 : parseFloat(firstCity.longitude as string) || 0;
           }
 
+          setSelectedDistrict(cityName);
+          const cityAsDistrict: District = { id: 0, name: cityName, lat, lng };
+          try {
+            const apiDistricts = await getDistrictsByCity(cityName, state.name, selectedCountry);
+            setDistricts([cityAsDistrict, ...apiDistricts]);
+          } catch {
+            setDistricts([cityAsDistrict]);
+          }
+          setIsDistrictsLoading(false);
+
           setLocation({
             country: selectedCountry,
             state: state.name,
             city: cityName,
+            district: cityName,
             lat,
             lng,
           });
         } else {
+          // 无城市数据时（如香港、澳门等独立地区），城市名回退到州名
           const fallback = await resolveStandaloneRegionFallback(selectedCountry, state);
           const cityName = fallback?.city || stateName;
           setSelectedCity(cityName);
-          setCities([]);
+          setSelectedDistrict(cityName);
+          setDistricts([
+            { id: 0, name: cityName, lat: fallback?.lat || 0, lng: fallback?.lng || 0 },
+          ]);
+          setIsDistrictsLoading(false);
           setLocation({
             country: selectedCountry,
             state: state.name,
             city: cityName,
+            district: cityName,
             ...(fallback ? { lat: fallback.lat, lng: fallback.lng } : {}),
           });
         }
@@ -768,11 +987,14 @@ export default function MapPosterGenerator() {
     } catch (error) {
       console.error("Error loading cities:", error);
       setIsCitiesLoading(false);
+      setIsDistrictsLoading(false);
     }
   };
 
   const handleCityChange = async (cityName: string) => {
     setSelectedCity(cityName);
+    setDistricts([]);
+    setIsDistrictsLoading(true);
 
     let coordinates: { lat: number; lng: number } | null = null;
 
@@ -798,13 +1020,52 @@ export default function MapPosterGenerator() {
       setSelectedCity(resolvedCityName);
     }
 
+    // 构建区列表：城市自身作为默认项（id=0），API 数据排后面
+    setSelectedDistrict(resolvedCityName);
+    const cityAsDistrict: District = {
+      id: 0,
+      name: resolvedCityName,
+      lat: resolvedCoordinates.lat,
+      lng: resolvedCoordinates.lng,
+    };
+    try {
+      const apiDistricts = await getDistrictsByCity(
+        resolvedCityName,
+        selectedState,
+        selectedCountry
+      );
+      setDistricts([cityAsDistrict, ...apiDistricts]);
+    } catch {
+      setDistricts([cityAsDistrict]);
+    }
+    setIsDistrictsLoading(false);
+
     setLocation({
       country: selectedCountry,
       state: selectedState,
       city: resolvedCityName,
+      district: resolvedCityName,
       lat: resolvedCoordinates.lat,
       lng: resolvedCoordinates.lng,
     });
+  };
+
+  /**
+   * 区/县选择变更：从 districts 中查找对应坐标并更新 location
+   * 选中城市自身（id=0）时 location.district 仍写城市名，等价于三级选择器的行为
+   */
+  const handleDistrictChange = (districtName: string) => {
+    setSelectedDistrict(districtName);
+
+    const district = districts.find((d) => d.name === districtName);
+    if (district) {
+      setLocation((prev) => ({
+        ...prev,
+        district: districtName,
+        lat: district.lat,
+        lng: district.lng,
+      }));
+    }
   };
 
   const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -831,19 +1092,59 @@ export default function MapPosterGenerator() {
       const fontData = new Uint8Array(arrayBuffer);
       setCustomFont(fontData);
       setFontFileName(file.name);
+      setSelectedPreset("custom");
+      fontCacheRef.current.set("custom", { data: fontData, fileName: file.name });
     } catch (error) {
       console.error("Font upload failed:", error);
       alert(m.font_upload_error());
       setCustomFont(null);
       setFontFileName("");
+      setSelectedPreset("default");
+      fontCacheRef.current.delete("custom");
     }
   };
 
   const clearCustomFont = () => {
     setCustomFont(null);
     setFontFileName("");
+    setSelectedPreset("default");
     if (fontFileInputRef.current) {
       fontFileInputRef.current.value = "";
+    }
+  };
+
+  // 字体内存缓存，避免重复 fetch
+  const fontCacheRef = useRef<Map<string, { data: Uint8Array; fileName: string }>>(new Map());
+
+  const handlePresetFontSelect = async (preset: string) => {
+    setSelectedPreset(preset);
+
+    if (preset === "default") {
+      clearCustomFont();
+      return;
+    }
+
+    // 内存缓存命中：预览从 fontCacheRef 读取，无需更新 React state
+    if (fontCacheRef.current.has(preset)) return;
+
+    const fontUrl = fontMap[preset];
+    if (!fontUrl) return;
+
+    setFontLoadingPreset(preset);
+    try {
+      const response = await fetch(fontUrl);
+      if (!response.ok) throw new Error(`Failed to fetch font: ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      const fontData = new Uint8Array(arrayBuffer);
+      const fileName = fontUrl.split("/").pop() || "";
+      fontCacheRef.current.set(preset, { data: fontData, fileName });
+    } catch (error) {
+      console.error("Failed to load preset font:", error);
+      alert(m.font_upload_error());
+      setSelectedPreset("default");
+      clearCustomFont();
+    } finally {
+      setFontLoadingPreset(null);
     }
   };
 
@@ -921,7 +1222,8 @@ export default function MapPosterGenerator() {
         lat,
         lng,
         baseRadius,
-        lodMode
+        lodMode,
+        location.district
       );
 
       const { roads, water, parks, pois: poisRaw, fromCache, cacheLevel, isProtomaps } = mapResults;
@@ -999,7 +1301,8 @@ export default function MapPosterGenerator() {
         theme: colors,
         width,
         height,
-        display_city: customTitle || location.city.toUpperCase(),
+        display_city:
+          customTitle || location.district?.toUpperCase() || location.city.toUpperCase(),
         display_country: location.country,
         text_position: "bottom",
         selected_size_height: selectedSize.height * FRONTEND_SCALE,
@@ -1034,9 +1337,10 @@ export default function MapPosterGenerator() {
         poisBin.buffer,
       ];
 
-      // 如果有自定义字体，注入
-      if (customFont) {
-        const fontCopy = new Uint8Array(customFont);
+      // 从缓存直接取字体数据，与预览状态解耦
+      const fontData = fontCacheRef.current.get(selectedPreset)?.data;
+      if (fontData) {
+        const fontCopy = new Uint8Array(fontData);
         renderOptions.custom_font = fontCopy;
         finalTransfers.push(fontCopy.buffer);
       }
@@ -1101,6 +1405,30 @@ export default function MapPosterGenerator() {
 
   useDynamicFont(activeLang);
 
+  const navSections = useMemo<NavSection[]>(
+    () => [
+      { id: "section-location", icon: <MapPin className="w-5 h-5" />, label: m.location() },
+      { id: "section-data", icon: <Settings2 className="w-5 h-5" />, label: m.label_map_radius() },
+      {
+        id: "section-theme-colors",
+        icon: <Palette className="w-5 h-5" />,
+        label: m.theme_colors(),
+      },
+      {
+        id: "section-text-display",
+        icon: <Type className="w-5 h-5" />,
+        label: m.text_display_toggles(),
+      },
+      {
+        id: "section-font-settings",
+        icon: <FileText className="w-5 h-5" />,
+        label: m.font_settings(),
+      },
+      { id: "section-poster-size", icon: <Scaling className="w-5 h-5" />, label: m.poster_size() },
+    ],
+    []
+  );
+
   return (
     <>
       <SEOHead />
@@ -1135,71 +1463,101 @@ export default function MapPosterGenerator() {
         />
 
         <main className="flex-1 overflow-auto custom-scrollbar w-full mx-auto px-4 py-6">
-          <div className="grid md:grid-cols-[380px_1fr] px-0 md:px-20 gap-8 md:h-full">
-            <div className="space-y-5 md:overflow-y-auto custom-scrollbar md:min-h-0">
-              <LocationSettings
-                location={location}
-                countries={countries}
-                states={states}
-                cities={cities}
-                selectedCountry={selectedCountry}
-                selectedState={selectedState}
-                selectedCity={selectedCity}
-                customTitle={customTitle}
-                isStatesLoading={isStatesLoading}
-                isCitiesLoading={isCitiesLoading}
-                locationLoading={locationLoading}
-                onCountryChange={handleCountryChange}
-                onStateChange={handleStateChange}
-                onCityChange={handleCityChange}
-                onCustomTitleChange={setCustomTitle}
+          <div className="grid md:grid-cols-[480px_1fr] px-0 md:px-20 gap-8 md:h-full">
+            <div className="flex flex-row gap-8 md:min-h-0">
+              <ConfigNav
+                sections={navSections}
+                activeSection={activeSection}
+                onNavigate={handleNavNavigate}
               />
+              <div
+                ref={configScrollRef}
+                className="flex-1 space-y-8 md:overflow-y-auto custom-scrollbar md:min-h-0"
+              >
+                <div id="section-location" ref={setSectionRef("section-location")}>
+                  <LocationSettings
+                    location={location}
+                    countries={countries}
+                    states={states}
+                    cities={cities}
+                    districts={districts}
+                    selectedCountry={selectedCountry}
+                    selectedState={selectedState}
+                    selectedCity={selectedCity}
+                    selectedDistrict={selectedDistrict}
+                    customTitle={customTitle}
+                    isStatesLoading={isStatesLoading}
+                    isCitiesLoading={isCitiesLoading}
+                    isDistrictsLoading={isDistrictsLoading}
+                    locationLoading={locationLoading}
+                    onCountryChange={handleCountryChange}
+                    onStateChange={handleStateChange}
+                    onCityChange={handleCityChange}
+                    onDistrictChange={handleDistrictChange}
+                    onCustomTitleChange={setCustomTitle}
+                  />
+                </div>
 
-              <DataSettings baseRadius={baseRadius} onBaseRadiusChange={setBaseRadius} />
+                <div id="section-data" ref={setSectionRef("section-data")}>
+                  <DataSettings baseRadius={baseRadius} onBaseRadiusChange={setBaseRadius} />
+                </div>
 
-              <ThemeColors
-                selectedTheme={selectedTheme}
-                customColors={customColors}
-                useCustomColors={useCustomColors}
-                themeNameMap={themeNameMap}
-                onThemeChange={(theme) => {
-                  setSelectedTheme(theme);
-                  setCustomColors(theme.colors);
-                  setUseCustomColors(false);
-                }}
-                onCustomColorsChange={setCustomColors}
-                onUseCustomColorsChange={setUseCustomColors}
-              />
+                <div id="section-theme-colors" ref={setSectionRef("section-theme-colors")}>
+                  <ThemeColors
+                    selectedTheme={selectedTheme}
+                    customColors={customColors}
+                    useCustomColors={useCustomColors}
+                    themeNameMap={themeNameMap}
+                    onThemeChange={(theme) => {
+                      setSelectedTheme(theme);
+                      setCustomColors(theme.colors);
+                      setUseCustomColors(false);
+                    }}
+                    onCustomColorsChange={setCustomColors}
+                    onUseCustomColorsChange={setUseCustomColors}
+                  />
+                </div>
 
-              <FontSettings
-                customFont={customFont}
-                fontFileName={fontFileName}
-                fontFileInputRef={fontFileInputRef}
-                onFontUpload={handleFontUpload}
-                onClearFont={clearCustomFont}
-              />
+                <div id="section-text-display" ref={setSectionRef("section-text-display")}>
+                  <TextDisplaySettings
+                    showCoords={showCoords}
+                    showCity={showCity}
+                    showCountry={showCountry}
+                    onShowCoordsChange={setShowCoords}
+                    onShowCityChange={setShowCity}
+                    onShowCountryChange={setShowCountry}
+                  />
+                </div>
 
-              <TextDisplaySettings
-                showCoords={showCoords}
-                showCity={showCity}
-                showCountry={showCountry}
-                onShowCoordsChange={setShowCoords}
-                onShowCityChange={setShowCity}
-                onShowCountryChange={setShowCountry}
-              />
+                <div id="section-font-settings" ref={setSectionRef("section-font-settings")}>
+                  <FontSettings
+                    customFont={customFont}
+                    fontFileName={fontFileName}
+                    fontFileInputRef={fontFileInputRef}
+                    onFontUpload={handleFontUpload}
+                    onClearFont={clearCustomFont}
+                    selectedPreset={selectedPreset}
+                    fontLoadingPreset={fontLoadingPreset}
+                    onPresetFontSelect={handlePresetFontSelect}
+                  />
+                </div>
 
-              <PosterSizeSelector
-                sizes={SIZES}
-                selectedSize={selectedSize}
-                onSizeChange={setSelectedSize}
-              />
+                <div id="section-poster-size" ref={setSectionRef("section-poster-size")}>
+                  <PosterSizeSelector
+                    sizes={SIZES}
+                    selectedSize={selectedSize}
+                    onSizeChange={setSelectedSize}
+                  />
+                </div>
+              </div>
             </div>
 
             <MapPreview
               location={location}
               selectedSize={selectedSize}
               colors={colors}
-              customFont={customFont}
+              fontCacheRef={fontCacheRef}
+              selectedPreset={deferredSelectedPreset}
               baseRadius={baseRadius}
               customTitle={customTitle}
               showCoords={showCoords}

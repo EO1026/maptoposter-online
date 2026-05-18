@@ -109,8 +109,22 @@ export default function Footer() {
               className="hover:text-primary transition-colors underline underline-offset-2"
             >
               OpenStreetMap
-            </a>{" "}
+            </a>
             {m.footer_contributors()}
+          </span>
+        </div>
+        <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">
+          <span>
+            Font{" "}
+            <a
+              href="https://github.com/lxgw/LxgwNeoZhiSong"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors underline underline-offset-2"
+            >
+              LXGW Neo ZhiSong
+            </a>{" "}
+            by lxgw, under IPA Font License 1.0
           </span>
         </div>
       </div>

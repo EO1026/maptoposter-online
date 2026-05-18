@@ -174,3 +174,5 @@ If this project has saved you time or made your life easier, consider buying me 
 Inspired by [@originalankur](https://github.com/originalankur)'s [maptoposter](https://github.com/originalankur/maptoposter)
 
 Map data provided by [OpenStreetMap](https://www.openstreetmap.org/) and [Protomaps](https://protomaps.com/)
+
+Font LXGW Neo ZhiSong (霞鹜新致宋) by [lxgw](https://github.com/lxgw/LxgwNeoZhiSong), licensed under IPA Font License 1.0

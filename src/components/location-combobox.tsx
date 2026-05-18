@@ -36,16 +36,15 @@ export function LocationCombobox({
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 性能关键：只显示匹配的前 100 条结果，避免 DOM 节点过多导致卡顿
   const filteredOptions = useMemo(() => {
-    if (!searchQuery) return options.slice(0, 100);
+    if (!searchQuery) return options.slice(0, 500);
 
     const lowerQuery = searchQuery.toLowerCase();
     const matches = [];
     for (const option of options) {
       if (option.name.toLowerCase().includes(lowerQuery)) {
         matches.push(option);
-        if (matches.length >= 100) break; // 限制展示数量
+        if (matches.length >= 500) break;
       }
     }
     return matches;

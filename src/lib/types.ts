@@ -23,6 +23,7 @@ export interface Location {
   country: string;
   state: string;
   city: string;
+  district?: string;
   lat?: number;
   lng?: number;
 }

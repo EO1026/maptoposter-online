@@ -49,6 +49,13 @@ export interface City {
   stateId?: number; // 原始 state ID
 }
 
+export interface District {
+  id: number; // OSM relation ID, 0 for city-as-district fallback
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 export interface LocationData {
   countries: Country[];
   states: State[];

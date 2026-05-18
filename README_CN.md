@@ -174,3 +174,5 @@ MIT 许可证 —— 详见 [LICENSE](LICENSE)
 灵感来源于 [@originalankur](https://github.com/originalankur) 的 [maptoposter](https://github.com/originalankur/maptoposter)
 
 地图数据由 [OpenStreetMap](https://www.openstreetmap.org/) 和 [Protomaps](https://protomaps.com/) 提供
+
+字体 霞鹜新致宋 (LXGW Neo ZhiSong) 由 [lxgw](https://github.com/lxgw/LxgwNeoZhiSong) 创作，基于 IPA Font License 1.0 授权

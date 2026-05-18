@@ -4,13 +4,19 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Country, State, City } from "@/services/location-types";
+import type { Country, State, City, District } from "@/services/location-types";
 import { locationService } from "@/services/location-service";
+import { districtService } from "@/services/district-service";
 
 export interface UseLocationDataResult {
   countries: Country[];
   getStatesByCountry: (countryId: number) => Promise<State[]>;
   getCitiesByState: (stateId: number) => Promise<City[]>;
+  getDistrictsByCity: (
+    cityName: string,
+    stateName: string,
+    countryName: string
+  ) => Promise<District[]>;
   getCountryByName: (name: string) => Promise<Country | undefined>;
   getStateByName: (countryId: number, stateName: string) => Promise<State | undefined>;
   getCityByName: (stateId: number, cityName: string) => Promise<City | undefined>;
@@ -66,6 +72,7 @@ export function useLocationData(): UseLocationDataResult {
     countries,
     getStatesByCountry: locationService.getStatesByCountry.bind(locationService),
     getCitiesByState: locationService.getCitiesByState.bind(locationService),
+    getDistrictsByCity: districtService.getDistrictsByCity.bind(districtService),
     getCountryByName: locationService.getCountryByName.bind(locationService),
     getStateByName: locationService.getStateByName.bind(locationService),
     getCityByName: locationService.getCityByName.bind(locationService),

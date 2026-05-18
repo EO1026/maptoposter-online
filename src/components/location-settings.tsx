@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { LocationCombobox } from "@/components/location-combobox";
 import { MapPin } from "lucide-react";
 import { type Location } from "@/lib/types";
-import { type State, type City, type Country } from "@/services/location-types";
+import { type State, type City, type Country, type District } from "@/services/location-types";
 import * as m from "@/paraglide/messages";
 
 interface LocationSettingsProps {
@@ -12,16 +12,20 @@ interface LocationSettingsProps {
   countries: Country[];
   states: State[];
   cities: City[];
+  districts: District[];
   selectedCountry: string;
   selectedState: string;
   selectedCity: string;
+  selectedDistrict: string;
   customTitle: string;
   isStatesLoading: boolean;
   isCitiesLoading: boolean;
+  isDistrictsLoading: boolean;
   locationLoading: boolean;
   onCountryChange: (val: string) => void;
   onStateChange: (val: string) => void;
   onCityChange: (val: string) => void;
+  onDistrictChange: (val: string) => void;
   onCustomTitleChange: (val: string) => void;
 }
 
@@ -30,16 +34,20 @@ export function LocationSettings({
   countries,
   states,
   cities,
+  districts,
   selectedCountry,
   selectedState,
   selectedCity,
+  selectedDistrict,
   customTitle,
   isStatesLoading,
   isCitiesLoading,
+  isDistrictsLoading,
   locationLoading,
   onCountryChange,
   onStateChange,
   onCityChange,
+  onDistrictChange,
   onCustomTitleChange,
 }: LocationSettingsProps) {
   return (
@@ -88,6 +96,20 @@ export function LocationSettings({
             emptyText={m.empty_city()}
             disabled={cities.length === 0 && !isCitiesLoading}
             isLoading={isCitiesLoading}
+          />
+        </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            {m.label_district()}
+          </Label>
+          <LocationCombobox
+            options={districts}
+            value={selectedDistrict}
+            onValueChange={onDistrictChange}
+            placeholder={m.placeholder_select_district()}
+            emptyText={m.empty_district()}
+            disabled={districts.length === 0 && !isDistrictsLoading}
+            isLoading={isDistrictsLoading}
           />
         </div>
         <div>
