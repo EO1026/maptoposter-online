@@ -45,7 +45,7 @@ export function DataSettings({ baseRadius, onBaseRadiusChange }: DataSettingsPro
               ))}
             </SelectContent>
           </Select>
-          <p className="text-[10px] italic px-1 text-muted-foreground">{m.radius_desc()}</p>
+          <p className="text-[12px] italic px-1 text-muted-foreground">{m.radius_desc()}</p>
         </div>
       </div>
     </Card>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useDeferredValue, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useDeferredValue, useMemo } from "react";
 import { type PosterSize } from "@/components/artistic-map";
 import {
   Square,
@@ -23,8 +23,10 @@ import { mapDataService } from "./services/map-data";
 import { type State, type City, type District } from "@/services/location-types";
 // Paraglide i18n
 import * as m from "@/paraglide/messages";
-import { getLocale, setLocale, locales } from "@/paraglide/runtime";
 import { useDynamicFont } from "./hooks/useDynamicFont";
+import { useLanguage } from "./hooks/useLanguage";
+import { useConfigNavigation } from "./hooks/useConfigNavigation";
+import { useFontManagement } from "./hooks/useFontManagement";
 import { PosterGallery } from "./components/gallery";
 import Footer from "./components/footer";
 import { ConfigNav, type NavSection } from "./components/config-nav";
@@ -38,8 +40,7 @@ import { TextDisplaySettings } from "./components/text-display-settings";
 import { PosterSizeSelector } from "./components/poster-size-selector";
 import { MapPreview } from "./components/map-preview";
 import { GenerationModal } from "./components/generation-modal";
-
-type AvailableLanguageTag = (typeof locales)[number];
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
 // Extended PosterSize includes icon for size selector UI
 interface LocalPosterSize extends PosterSize {
@@ -196,11 +197,6 @@ function namesReferToSameLocation(first: string, second: string): boolean {
   );
 }
 
-const fontMap: Record<string, string> = {
-  LXGW_Neo_ZhiSong: "/font/LXGWNeoZhiSong.ttf",
-  fraunces: "/font/Fraunces_72pt-Regular.ttf",
-};
-
 export default function MapPosterGenerator() {
   const {
     countries,
@@ -210,8 +206,18 @@ export default function MapPosterGenerator() {
     isLoading: locationLoading,
   } = useLocationData();
 
-  // i18n language state
-  const [activeLang, setActiveLang] = useState<AvailableLanguageTag>(getLocale());
+  const { activeLang, handleLanguageChange } = useLanguage();
+  const {
+    customFont,
+    fontFileName,
+    fontFileInputRef,
+    selectedPreset,
+    fontLoadingPreset,
+    fontCacheRef,
+    handleFontUpload,
+    clearCustomFont,
+    handlePresetFontSelect,
+  } = useFontManagement();
 
   const [location, setLocation] = useState<Location>(EXAMPLES[0].location);
   const [selectedTheme, setSelectedTheme] = useState(THEMES[0]);
@@ -225,92 +231,100 @@ export default function MapPosterGenerator() {
   const generationCompleteRef = useRef(false);
   const [customTitle, setCustomTitle] = useState("");
   const previewRef = useRef<HTMLDivElement>(null);
+  const [locationMode, setLocationMode] = useState<"search" | "coordinates">("search");
 
   // Localized Sizes
-  const SIZES: LocalPosterSize[] = [
-    {
-      id: "iphone",
-      name: m.size_iphone(),
-      width: 1500,
-      height: 3200,
-      icon: <Smartphone className="w-4 h-4" />,
-    },
-    {
-      id: "square",
-      name: m.size_square(),
-      width: 3000,
-      height: 3000,
-      icon: <Square className="w-4 h-4" />,
-    },
-    {
-      id: "poster-3x4-portrait",
-      name: m.size_poster_3x4_portrait(),
-      width: 2400,
-      height: 3200,
-      icon: <FileImage className="w-4 h-4" />,
-    },
-    {
-      id: "poster-9x16-portrait",
-      name: m.size_poster_9x16_portrait(),
-      width: 2160,
-      height: 3840,
-      icon: <FileImage className="w-4 h-4" />,
-    },
-    {
-      id: "poster-4x3-landscape",
-      name: m.size_poster_4x3_landscape(),
-      width: 3200,
-      height: 2400,
-      icon: <Monitor className="w-4 h-4" />,
-    },
-    {
-      id: "desktop",
-      name: m.size_desktop(),
-      width: 3840,
-      height: 2160,
-      icon: <Monitor className="w-4 h-4" />,
-    },
-    {
-      id: "a4-portrait",
-      name: m.size_a4_portrait(),
-      width: 2480,
-      height: 3508,
-      icon: <FileImage className="w-4 h-4" />,
-    },
-    {
-      id: "a4-landscape",
-      name: m.size_a4_landscape(),
-      width: 3508,
-      height: 2480,
-      icon: <FileImage className="w-4 h-4 rotate-90" />,
-    },
-  ];
+  const SIZES: LocalPosterSize[] = useMemo(
+    () => [
+      {
+        id: "iphone",
+        name: m.size_iphone(),
+        width: 1500,
+        height: 3200,
+        icon: <Smartphone className="w-4 h-4" />,
+      },
+      {
+        id: "square",
+        name: m.size_square(),
+        width: 3000,
+        height: 3000,
+        icon: <Square className="w-4 h-4" />,
+      },
+      {
+        id: "poster-3x4-portrait",
+        name: m.size_poster_3x4_portrait(),
+        width: 2400,
+        height: 3200,
+        icon: <FileImage className="w-4 h-4" />,
+      },
+      {
+        id: "poster-9x16-portrait",
+        name: m.size_poster_9x16_portrait(),
+        width: 2160,
+        height: 3840,
+        icon: <FileImage className="w-4 h-4" />,
+      },
+      {
+        id: "poster-4x3-landscape",
+        name: m.size_poster_4x3_landscape(),
+        width: 3200,
+        height: 2400,
+        icon: <Monitor className="w-4 h-4" />,
+      },
+      {
+        id: "desktop",
+        name: m.size_desktop(),
+        width: 3840,
+        height: 2160,
+        icon: <Monitor className="w-4 h-4" />,
+      },
+      {
+        id: "a4-portrait",
+        name: m.size_a4_portrait(),
+        width: 2480,
+        height: 3508,
+        icon: <FileImage className="w-4 h-4" />,
+      },
+      {
+        id: "a4-landscape",
+        name: m.size_a4_landscape(),
+        width: 3508,
+        height: 2480,
+        icon: <FileImage className="w-4 h-4 rotate-90" />,
+      },
+    ],
+    [activeLang]
+  );
 
-  const [selectedSize, setSelectedSize] = useState(SIZES[0]);
+  const [selectedSizeId, setSelectedSizeId] = useState<string>("iphone");
+  const selectedSize = SIZES.find((size) => size.id === selectedSizeId) || SIZES[0];
 
   // Map theme IDs to translation functions
-  const themeNameMap: Record<string, string> = {
-    "Nordic-Frost": m.theme_nordic_frost(),
-    "Desert-Rose": m.theme_desert_rose(),
-    "Cyberpunk-Neon": m.theme_cyberpunk_neon(),
-    "Sulfur-Slate": m.theme_sulfur_slate(),
-    "Vintage-Nautical": m.theme_vintage_nautical(),
-    "Lavender-Mist": m.theme_lavender_mist(),
-    "Carbon-Fiber": m.theme_carbon_fiber(),
-    "Mediterranean-Summer": m.theme_mediterranean_summer(),
-    "Royal-Velvet": m.theme_royal_velvet(),
-    "Forest-Moss": m.theme_forest_moss(),
-    "Cotton-Candy": m.theme_cotton_candy(),
-    "Brutalist-Concrete": m.theme_brutalist_concrete(),
-    "Solarized-Dark": m.theme_solarized_dark(),
-    "Matcha-Latte": m.theme_matcha_latte(),
-    "Red-Alert": m.theme_red_alert(),
-    "Gilded-Noir": m.theme_gilded_noir(),
-    "Ocean-Abyss": m.theme_ocean_abyss(),
-    "Sakura-Branch": m.theme_sakura_branch(),
-    "Terra-Clay": m.theme_terra_clay(),
-    "Glitch-Purple": m.theme_glitch_purple(),
-  };
+  const themeNameMap: Record<string, string> = useMemo(
+    () => ({
+      "Nordic-Frost": m.theme_nordic_frost(),
+      "Desert-Rose": m.theme_desert_rose(),
+      "Cyberpunk-Neon": m.theme_cyberpunk_neon(),
+      "Sulfur-Slate": m.theme_sulfur_slate(),
+      "Vintage-Nautical": m.theme_vintage_nautical(),
+      "Lavender-Mist": m.theme_lavender_mist(),
+      "Carbon-Fiber": m.theme_carbon_fiber(),
+      "Mediterranean-Summer": m.theme_mediterranean_summer(),
+      "Royal-Velvet": m.theme_royal_velvet(),
+      "Forest-Moss": m.theme_forest_moss(),
+      "Cotton-Candy": m.theme_cotton_candy(),
+      "Brutalist-Concrete": m.theme_brutalist_concrete(),
+      "Solarized-Dark": m.theme_solarized_dark(),
+      "Matcha-Latte": m.theme_matcha_latte(),
+      "Red-Alert": m.theme_red_alert(),
+      "Gilded-Noir": m.theme_gilded_noir(),
+      "Ocean-Abyss": m.theme_ocean_abyss(),
+      "Sakura-Branch": m.theme_sakura_branch(),
+      "Terra-Clay": m.theme_terra_clay(),
+      "Glitch-Purple": m.theme_glitch_purple(),
+    }),
+    [activeLang]
+  );
 
   // 地点选择状态（国 → 省 → 市 → 区 四级联动）
   const [selectedCountry, setSelectedCountry] = useState<string>("");
@@ -361,13 +375,6 @@ export default function MapPosterGenerator() {
     };
   };
 
-  // Font upload state
-  const [customFont, setCustomFont] = useState<Uint8Array | null>(null);
-  const [fontFileName, setFontFileName] = useState<string>("");
-  const fontFileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedPreset, setSelectedPreset] = useState<string>("default");
-  const [fontLoadingPreset, setFontLoadingPreset] = useState<string | null>(null);
-
   // Data settings state
   const [lodMode, setLodMode] = useState<"simplified" | "detailed">("simplified");
   const [baseRadius, setBaseRadius] = useState(15000);
@@ -377,76 +384,40 @@ export default function MapPosterGenerator() {
   const [showCity, setShowCity] = useState(true);
   const [showCountry, setShowCountry] = useState(true);
 
-  // Config navigation state
-  const configScrollRef = useRef<HTMLDivElement>(null);
-  const [activeSection, setActiveSection] = useState("section-location");
-  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const isNavScrollingRef = useRef(false);
-
-  const setSectionRef = useCallback(
-    (id: string) => (el: HTMLElement | null) => {
-      if (el) {
-        sectionRefs.current.set(id, el);
-      } else {
-        sectionRefs.current.delete(id);
-      }
-    },
-    []
-  );
-
-  const handleNavNavigate = useCallback((sectionId: string) => {
-    isNavScrollingRef.current = true;
-    setActiveSection(sectionId);
-    const el = sectionRefs.current.get(sectionId);
-    const container = configScrollRef.current;
-    if (el && container) {
-      requestAnimationFrame(() => {
-        const containerRect = container.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const scrollTop = container.scrollTop + elRect.top - containerRect.top;
-        container.scrollTo({ top: scrollTop, behavior: "smooth" });
-      });
-    }
-  }, []);
-
-  // Initialize language on mount
-  useEffect(() => {
-    let lang: AvailableLanguageTag;
-
-    // Priority 1: URL path (e.g., /fr/ or /zh/)
-    const pathLang = window.location.pathname.replace(/^\//, "").split("/")[0];
-    if (pathLang && locales.includes(pathLang as AvailableLanguageTag)) {
-      lang = pathLang as AvailableLanguageTag;
-    }
-    // Priority 2: localStorage
-    else {
-      const savedLang = localStorage.getItem("lang") as AvailableLanguageTag;
-      if (savedLang && locales.includes(savedLang)) {
-        lang = savedLang;
-      }
-      // Priority 3: Browser language
-      else {
-        const browserLang = navigator.language;
-        const matchedLang = locales.find((tag) => browserLang.startsWith(tag));
-        lang = (matchedLang || "en") as AvailableLanguageTag;
-      }
-    }
-
-    setLocale(lang, { reload: false });
-    setActiveLang(lang);
-    localStorage.setItem("lang", lang);
-    document.title = `${m.app_title()} - ${m.app_subtitle()}`;
-  }, []);
-
-  const handleLanguageChange = (newLang: AvailableLanguageTag) => {
-    setLocale(newLang, { reload: false });
-    setActiveLang(newLang);
-    localStorage.setItem("lang", newLang);
-    document.title = `${m.app_title()} - ${m.app_subtitle()}`;
-  };
-
   // Persistence Handling
   const isRestored = useRef(false);
+
+  const handleLocationModeChange = (mode: "search" | "coordinates") => {
+    setLocationMode(mode);
+  };
+
+  const handleLatChange = (lat: number) => {
+    setLocation((prev) => ({ ...prev, lat }));
+  };
+
+  const handleLngChange = (lng: number) => {
+    setLocation((prev) => ({ ...prev, lng }));
+  };
+
+  const { handleCoordinateReverseGeocode } = useReverseGeocode({
+    countries,
+    getStatesByCountry,
+    getCitiesByState,
+    getDistrictsByCity,
+    setters: {
+      setSelectedCountry,
+      setSelectedState,
+      setSelectedCity,
+      setSelectedDistrict,
+      setStates,
+      setCities,
+      setDistricts,
+      setIsStatesLoading,
+      setIsCitiesLoading,
+      setIsDistrictsLoading,
+      setLocation,
+    },
+  });
 
   // Persistence Effect: Save settings to LocalStorage whenever they change
   useEffect(() => {
@@ -461,7 +432,7 @@ export default function MapPosterGenerator() {
       customTitle,
       lodMode,
       baseRadius,
-      selectedSizeId: selectedSize.id,
+      selectedSizeId,
       location, // Store the lat/lng coordinates too
       showCoords,
       showCity,
@@ -476,7 +447,7 @@ export default function MapPosterGenerator() {
     customTitle,
     lodMode,
     baseRadius,
-    selectedSize,
+    selectedSizeId,
     location,
     showCoords,
     showCity,
@@ -490,8 +461,9 @@ export default function MapPosterGenerator() {
         const config = JSON.parse(savedConfig);
 
         // Restore Size
-        const savedSize = SIZES.find((s) => s.id === config.selectedSizeId);
-        if (savedSize) setSelectedSize(savedSize);
+        if (SIZES.some((size) => size.id === config.selectedSizeId)) {
+          setSelectedSizeId(config.selectedSizeId);
+        }
 
         // Restore LOD & Radius
         if (config.lodMode) setLodMode(config.lodMode);
@@ -758,75 +730,6 @@ export default function MapPosterGenerator() {
     }
   }, [countries]);
 
-  const prefetchFonts = useCallback(async () => {
-    for (const [preset, url] of Object.entries(fontMap)) {
-      if (fontCacheRef.current.has(preset)) continue;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) continue;
-        const fontData = new Uint8Array(await res.arrayBuffer());
-        const fileName = url.split("/").pop() || "";
-        fontCacheRef.current.set(preset, { data: fontData, fileName });
-      } catch {
-        /* 静默失败，prefetch 不影响主流程 */
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    prefetchFonts();
-  }, []);
-
-  // IntersectionObserver: track which config section is most visible
-  const ioRatiosRef = useRef<Map<Element, number>>(new Map());
-
-  useEffect(() => {
-    const scrollContainer = configScrollRef.current;
-    if (!scrollContainer) return;
-
-    const onUserScroll = () => {
-      isNavScrollingRef.current = false;
-    };
-    scrollContainer.addEventListener("wheel", onUserScroll, { passive: true });
-    scrollContainer.addEventListener("touchstart", onUserScroll, { passive: true });
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isNavScrollingRef.current) return;
-        for (const entry of entries) {
-          ioRatiosRef.current.set(entry.target, entry.intersectionRatio);
-        }
-        let bestId: string | null = null;
-        let bestRatio = 0;
-        for (const [el, ratio] of ioRatiosRef.current) {
-          if (ratio > bestRatio) {
-            bestRatio = ratio;
-            bestId = el.id;
-          }
-        }
-        if (bestId) {
-          setActiveSection(bestId);
-        }
-      },
-      {
-        root: scrollContainer,
-        threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
-      }
-    );
-
-    // 初始化 ratio 表
-    for (const el of sectionRefs.current.values()) {
-      ioRatiosRef.current.set(el, 0);
-      observer.observe(el);
-    }
-
-    return () => {
-      scrollContainer.removeEventListener("wheel", onUserScroll);
-      scrollContainer.removeEventListener("touchstart", onUserScroll);
-      observer.disconnect();
-    };
-  }, []);
-
   // Remove the old initialization useEffect (lines 182-211) as it's merged above
 
   const deferredCustomColors = useDeferredValue(customColors);
@@ -1065,86 +968,6 @@ export default function MapPosterGenerator() {
         lat: district.lat,
         lng: district.lng,
       }));
-    }
-  };
-
-  const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith(".ttf") && !fileName.endsWith(".otf")) {
-      alert(m.font_upload_error());
-      if (fontFileInputRef.current) fontFileInputRef.current.value = "";
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert(m.font_upload_error());
-      if (fontFileInputRef.current) fontFileInputRef.current.value = "";
-      return;
-    }
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const fontData = new Uint8Array(arrayBuffer);
-      setCustomFont(fontData);
-      setFontFileName(file.name);
-      setSelectedPreset("custom");
-      fontCacheRef.current.set("custom", { data: fontData, fileName: file.name });
-    } catch (error) {
-      console.error("Font upload failed:", error);
-      alert(m.font_upload_error());
-      setCustomFont(null);
-      setFontFileName("");
-      setSelectedPreset("default");
-      fontCacheRef.current.delete("custom");
-    }
-  };
-
-  const clearCustomFont = () => {
-    setCustomFont(null);
-    setFontFileName("");
-    setSelectedPreset("default");
-    if (fontFileInputRef.current) {
-      fontFileInputRef.current.value = "";
-    }
-  };
-
-  // 字体内存缓存，避免重复 fetch
-  const fontCacheRef = useRef<Map<string, { data: Uint8Array; fileName: string }>>(new Map());
-
-  const handlePresetFontSelect = async (preset: string) => {
-    setSelectedPreset(preset);
-
-    if (preset === "default") {
-      clearCustomFont();
-      return;
-    }
-
-    // 内存缓存命中：预览从 fontCacheRef 读取，无需更新 React state
-    if (fontCacheRef.current.has(preset)) return;
-
-    const fontUrl = fontMap[preset];
-    if (!fontUrl) return;
-
-    setFontLoadingPreset(preset);
-    try {
-      const response = await fetch(fontUrl);
-      if (!response.ok) throw new Error(`Failed to fetch font: ${response.status}`);
-      const arrayBuffer = await response.arrayBuffer();
-      const fontData = new Uint8Array(arrayBuffer);
-      const fileName = fontUrl.split("/").pop() || "";
-      fontCacheRef.current.set(preset, { data: fontData, fileName });
-    } catch (error) {
-      console.error("Failed to load preset font:", error);
-      alert(m.font_upload_error());
-      setSelectedPreset("default");
-      clearCustomFont();
-    } finally {
-      setFontLoadingPreset(null);
     }
   };
 
@@ -1426,8 +1249,10 @@ export default function MapPosterGenerator() {
       },
       { id: "section-poster-size", icon: <Scaling className="w-5 h-5" />, label: m.poster_size() },
     ],
-    []
+    [activeLang]
   );
+  const { configScrollRef, activeSection, setSectionRef, handleNavNavigate } =
+    useConfigNavigation(navSections);
 
   return (
     <>
@@ -1473,6 +1298,7 @@ export default function MapPosterGenerator() {
               <div
                 ref={configScrollRef}
                 className="flex-1 space-y-8 md:overflow-y-auto custom-scrollbar md:min-h-0"
+                key={activeLang}
               >
                 <div id="section-location" ref={setSectionRef("section-location")}>
                   <LocationSettings
@@ -1495,6 +1321,13 @@ export default function MapPosterGenerator() {
                     onCityChange={handleCityChange}
                     onDistrictChange={handleDistrictChange}
                     onCustomTitleChange={setCustomTitle}
+                    locationMode={locationMode}
+                    onLocationModeChange={handleLocationModeChange}
+                    coordinateLat={location.lat ?? 0}
+                    coordinateLng={location.lng ?? 0}
+                    onLatChange={handleLatChange}
+                    onLngChange={handleLngChange}
+                    onCoordinatesChange={handleCoordinateReverseGeocode}
                   />
                 </div>
 
@@ -1546,7 +1379,7 @@ export default function MapPosterGenerator() {
                   <PosterSizeSelector
                     sizes={SIZES}
                     selectedSize={selectedSize}
-                    onSizeChange={setSelectedSize}
+                    onSizeChange={(size) => setSelectedSizeId(size.id)}
                   />
                 </div>
               </div>
@@ -1564,10 +1397,18 @@ export default function MapPosterGenerator() {
               showCity={showCity}
               showCountry={showCountry}
               previewRef={previewRef}
+              interactive={true} // locationMode === "coordinates"
+              onMove={(loc) => {
+                setLocation((prev) => ({ ...prev, lat: loc.lat, lng: loc.lon }));
+              }}
+              onMoveEnd={(loc) => {
+                setLocation((prev) => ({ ...prev, lat: loc.lat, lng: loc.lon }));
+                handleCoordinateReverseGeocode(loc.lat, loc.lon);
+              }}
             />
           </div>
           <PosterGallery />
-          <Footer />
+          <Footer activeLang={activeLang} />
         </main>
       </div>
     </>

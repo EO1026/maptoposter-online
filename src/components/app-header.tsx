@@ -41,6 +41,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   const [supportOpen, setSupportOpen] = useState(false);
   const [starTarget, setStarTarget] = useState<number | null>(null);
+  const localeOptions = { locale: activeLang };
 
   useEffect(() => {
     fetch("https://api.github.com/repos/ianho7/maptoposter-online")
@@ -57,9 +58,11 @@ export function AppHeader({
       <div className="mx-0 md:mx-20 px-4 py-4 flex items-center">
         <img className="w-10 h-10 mr-2" src="/icon.svg" alt="icon" />
         <div className="mr-auto select-none">
-          <h1 className="text-2xl tracking-wide  text-foreground">{m.app_title()}</h1>
+          <h1 className="text-2xl tracking-wide  text-foreground">
+            {m.app_title({}, localeOptions)}
+          </h1>
           <p className="text-xs tracking-widest uppercase text-muted-foreground">
-            {m.app_subtitle()}
+            {m.app_subtitle({}, localeOptions)}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -87,7 +90,9 @@ export function AppHeader({
             disabled={isGenerating || locationLoading}
             className="gap-1 sm:gap-2 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
             data-ai-action="download-poster"
-            aria-label={isGenerating ? m.generating() : m.download_button()}
+            aria-label={
+              isGenerating ? m.generating({}, localeOptions) : m.download_button({}, localeOptions)
+            }
           >
             {isGenerating ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -95,7 +100,9 @@ export function AppHeader({
               <Download className="w-4 h-4" aria-hidden="true" />
             )}
             <span className="hidden sm:inline">
-              {isGenerating ? m.generating() : m.download_button()}
+              {isGenerating
+                ? m.generating({}, localeOptions)
+                : m.download_button({}, localeOptions)}
             </span>
           </Button>
           <Button
@@ -105,7 +112,7 @@ export function AppHeader({
             data-ai-action="open-support-dialog"
           >
             <Heart className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{m.support_button()}</span>
+            <span className="hidden sm:inline">{m.support_button({}, localeOptions)}</span>
           </Button>
           <Button
             onClick={() => window.open("https://github.com/ianho7/maptoposter-online", "_blank")}
@@ -115,12 +122,12 @@ export function AppHeader({
           >
             <GithubIcon className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">
-              {starTarget ? m.star_hint({ target: starTarget }) : "Github"}
+              {starTarget ? m.star_hint({ target: starTarget }, localeOptions) : "Github"}
             </span>
           </Button>
         </div>
       </div>
-      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} activeLang={activeLang} />
     </header>
   );
 }

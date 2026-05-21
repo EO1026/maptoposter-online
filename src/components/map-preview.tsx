@@ -1,7 +1,6 @@
 import { MapPosterPreview, type PosterSize } from "@/components/artistic-map";
 import { type Location } from "@/lib/types";
-import { m } from "@/paraglide/messages";
-import { useMemo } from "react";
+// import { m } from "@/paraglide/messages";
 
 interface MapColors {
   bg: string;
@@ -18,6 +17,11 @@ interface MapColors {
   road_default: string;
 }
 
+interface MapLocation {
+  lat: number;
+  lon: number;
+}
+
 interface MapPreviewProps {
   location: Location;
   selectedSize: PosterSize;
@@ -30,6 +34,9 @@ interface MapPreviewProps {
   showCity: boolean;
   showCountry: boolean;
   previewRef: React.RefObject<HTMLDivElement | null>;
+  interactive?: boolean;
+  onMove?: (location: MapLocation) => void;
+  onMoveEnd?: (location: MapLocation) => void;
 }
 
 export function MapPreview({
@@ -44,23 +51,23 @@ export function MapPreview({
   showCity,
   showCountry,
   previewRef,
+  interactive = false,
+  onMove,
+  onMoveEnd,
 }: MapPreviewProps) {
-  const previewTheme = useMemo(
-    () => ({
-      bg: colors.bg,
-      water: colors.water,
-      parks: colors.parks,
-      road_motorway: colors.road_motorway,
-      road_primary: colors.road_primary,
-      road_secondary: colors.road_secondary,
-      road_tertiary: colors.road_tertiary,
-      road_residential: colors.road_residential,
-      road_default: colors.road_default,
-      route: colors.poi_color || colors.text || colors.bg,
-      poi: colors.poi_color || colors.road_default,
-    }),
-    [colors]
-  );
+  const previewTheme = {
+    bg: colors.bg,
+    water: colors.water,
+    parks: colors.parks,
+    road_motorway: colors.road_motorway,
+    road_primary: colors.road_primary,
+    road_secondary: colors.road_secondary,
+    road_tertiary: colors.road_tertiary,
+    road_residential: colors.road_residential,
+    road_default: colors.road_default,
+    route: colors.poi_color || colors.text || colors.bg,
+    poi: colors.poi_color || colors.road_default,
+  };
 
   return (
     <div
@@ -83,11 +90,11 @@ export function MapPreview({
           backgroundSize: "20px 20px",
         }}
       />
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full pointer-events-none select-none">
+      {/* <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full pointer-events-none select-none">
         <span className="text-xs tracking-wide text-white font-light whitespace-nowrap text-shadow-sm">
           {m.preview_actual_result()}
         </span>
-      </div>
+      </div> */}
       <div
         ref={previewRef}
         className="flex items-center justify-center relative transition-all duration-300 ease-in-out w-full h-full p-4"
@@ -121,6 +128,9 @@ export function MapPreview({
             showCity={showCity}
             showCountry={showCountry}
             showCoords={showCoords}
+            interactive={interactive}
+            onMove={onMove}
+            onMoveEnd={onMoveEnd}
           />
         </div>
       </div>

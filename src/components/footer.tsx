@@ -5,6 +5,7 @@ import {
   Link,
 } from "lucide-react";
 import * as m from "@/paraglide/messages";
+import { type AvailableLanguageTag } from "@/hooks/useLanguage";
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -14,7 +15,11 @@ const GithubIcon = ({ className }: { className?: string }) => (
 
 const REPO_URL = "https://github.com/ianho7/maptoposter-online";
 
-export default function Footer() {
+interface FooterProps {
+  activeLang: AvailableLanguageTag;
+}
+
+export default function Footer({ activeLang }: FooterProps) {
   // const [emailCopied, setEmailCopied] = useState(false);
 
   // const handleCopyEmail = () => {
@@ -24,6 +29,7 @@ export default function Footer() {
   // };
 
   const currentYear = new Date().getFullYear();
+  const localeOptions = { locale: activeLang };
 
   return (
     <footer>
@@ -33,12 +39,12 @@ export default function Footer() {
           {/* Col 1: Project links */}
           <div className="space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {m.footer_project()}
+              {m.footer_project({}, localeOptions)}
             </h3>
             <ul className="space-y-2.5">
               {[
-                { label: m.footer_github_repo(), href: REPO_URL },
-                { label: m.footer_submit_issue(), href: `${REPO_URL}/issues` },
+                { label: m.footer_github_repo({}, localeOptions), href: REPO_URL },
+                { label: m.footer_submit_issue({}, localeOptions), href: `${REPO_URL}/issues` },
                 // { label: m.footer_feature_suggestions(), href: `${REPO_URL}/discussions` },
                 // { label: m.footer_changelog(), href: `${REPO_URL}/releases` },
               ].map((item) => (
@@ -80,10 +86,12 @@ export default function Footer() {
             <div className="border border-gray-200 bg-white px-4 py-4 space-y-2">
               <div className="flex items-center gap-2">
                 <GithubIcon className="w-4 h-4 text-primary" />
-                <span className="text-xs font-semibold text-primary">{m.footer_open_source()}</span>
+                <span className="text-xs font-semibold text-primary">
+                  {m.footer_open_source({}, localeOptions)}
+                </span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {m.footer_open_source_desc()}
+                {m.footer_open_source_desc({}, localeOptions)}
               </p>
               <a
                 href={REPO_URL}
@@ -92,7 +100,7 @@ export default function Footer() {
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
                 <Star className="w-3.5 h-3.5" />
-                {m.footer_star_on_github()}
+                {m.footer_star_on_github({}, localeOptions)}
               </a>
             </div>
           </div>
@@ -101,7 +109,7 @@ export default function Footer() {
         {/* ── Bottom bar ── */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">
           <span>
-            © {currentYear} Map To Poster · {m.footer_data_source()}{" "}
+            © {currentYear} Map To Poster · {m.footer_data_source({}, localeOptions)}{" "}
             <a
               href="https://www.openstreetmap.org/copyright"
               target="_blank"
@@ -110,7 +118,7 @@ export default function Footer() {
             >
               OpenStreetMap
             </a>
-            {m.footer_contributors()}
+            {m.footer_contributors({}, localeOptions)}
           </span>
         </div>
         <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">

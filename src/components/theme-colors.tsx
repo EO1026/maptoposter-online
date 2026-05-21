@@ -7,7 +7,7 @@ import { Palette } from "lucide-react";
 import { cn, isValidHexColor } from "@/lib/utils";
 import { MAP_THEMES, type MapColors, type MapTheme } from "@/lib/types";
 import * as m from "@/paraglide/messages";
-import { memo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ColorKey = keyof MapColors;
 
@@ -90,7 +90,7 @@ interface ColorInputProps {
   onChange: (key: ColorKey, value: string) => void;
 }
 
-const ColorInput = memo(function ColorInput({ colorKey, label, value, onChange }: ColorInputProps) {
+function ColorInput({ colorKey, label, value, onChange }: ColorInputProps) {
   const [localValue, setLocalValue] = useState(value);
 
   // 当父组件传入的 value 变化时（例如切换预设主题）同步本地状态
@@ -145,7 +145,7 @@ const ColorInput = memo(function ColorInput({ colorKey, label, value, onChange }
       </div>
     </div>
   );
-});
+}
 
 // ─── 主组件 ───
 

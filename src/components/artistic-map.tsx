@@ -348,11 +348,13 @@ function TextOverlay({
   const heightScale = (containerHeight / 1200) * 1.1;
   const scaleFactor = Math.min(widthScale, heightScale);
 
-  // 城市名需要先格式化再计算字号（与 WASM 端逻辑一致）
   const formattedCity = formatCityName(city);
-  const cityFontSize = calculateFontSize(formattedCity, 80 * scaleFactor, 30);
-  const countryFontSize = 28 * scaleFactor;
-  const coordsFontSize = 18 * scaleFactor;
+  const textSizes = {
+    formattedCity,
+    cityFontSize: calculateFontSize(formattedCity, 80 * scaleFactor, 30),
+    countryFontSize: 28 * scaleFactor,
+    coordsFontSize: 18 * scaleFactor,
+  };
 
   const rootFontSize =
     typeof document !== "undefined"
@@ -362,13 +364,16 @@ function TextOverlay({
   const anchorY = 0.88;
 
   const offsetPool = [50 * scaleFactor, 0, -40 * scaleFactor];
+
   const visibleItems: { label: string; fontSize: number; opacity?: number }[] = [];
-  if (showCity) visibleItems.push({ label: formatCityName(city), fontSize: cityFontSize });
-  if (showCountry) visibleItems.push({ label: country.toUpperCase(), fontSize: countryFontSize });
+  if (showCity)
+    visibleItems.push({ label: textSizes.formattedCity, fontSize: textSizes.cityFontSize });
+  if (showCountry)
+    visibleItems.push({ label: country.toUpperCase(), fontSize: textSizes.countryFontSize });
   if (showCoords)
     visibleItems.push({
       label: formatCoordinates(lat, lon),
-      fontSize: coordsFontSize,
+      fontSize: textSizes.coordsFontSize,
       opacity: 0.8,
     });
 
@@ -385,7 +390,17 @@ function TextOverlay({
   };
 
   return (
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
+    >
       {visibleItems.map((item, i) => (
         <span
           key={i}
@@ -420,6 +435,7 @@ interface MapPosterPreviewProps {
   routePoints?: RoutePoint[];
   className?: string;
   onLoad?: (map: maplibregl.Map) => void;
+  onMove?: (location: MapLocation) => void;
   onMoveEnd?: (location: MapLocation) => void;
   roadWidthMultiplier?: number;
   posterSize?: PosterSize;
@@ -430,6 +446,7 @@ interface MapPosterPreviewProps {
   showCity?: boolean;
   showCountry?: boolean;
   showCoords?: boolean;
+  interactive?: boolean;
 }
 
 export function MapPosterPreview({
@@ -444,6 +461,7 @@ export function MapPosterPreview({
   routePoints,
   className = "",
   onLoad,
+  onMove,
   onMoveEnd,
   roadWidthMultiplier = 1,
   posterSize,
@@ -454,35 +472,50 @@ export function MapPosterPreview({
   showCity,
   showCountry,
   showCoords,
+  interactive = false,
 }: MapPosterPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const isDraggingRef = useRef(false);
+  const onMoveRef = useRef(onMove);
+  const onMoveEndRef = useRef(onMoveEnd);
+  onMoveRef.current = onMove;
+  onMoveEndRef.current = onMoveEnd;
   const [isLoaded, setIsLoaded] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState<string>("sans-serif");
 
   // 通过 Object URL + CSS @font-face 加载字体，避免主线程 OTF 解析
   // 从 fontCacheRef 读取数据，不经过 React prop，避免 DevTools clone 大 Uint8Array
+  // 500ms 防抖：快速切换预设时避免频繁创建/销毁 style 元素
+  const fontData = fontCacheRef.current?.get(selectedPreset)?.data;
   useEffect(() => {
-    const fontData = fontCacheRef.current?.get(selectedPreset)?.data;
-    if (!fontData) {
-      setFontFamily("sans-serif");
-      return;
-    }
+    let cleanupFont: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      if (!fontData) {
+        setFontFamily("sans-serif");
+        return;
+      }
 
-    const blob = new Blob([fontData as BlobPart], { type: "font/otf" });
-    const objectUrl = URL.createObjectURL(blob);
-    const style = document.createElement("style");
-    style.textContent = `@font-face { font-family: "CustomFont"; src: url("${objectUrl}"); }`;
-    document.head.appendChild(style);
-    setFontFamily("CustomFont");
+      const blob = new Blob([fontData as BlobPart], { type: "font/otf" });
+      const objectUrl = URL.createObjectURL(blob);
+      const style = document.createElement("style");
+      style.textContent = `@font-face { font-family: "CustomFont"; src: url("${objectUrl}"); }`;
+      document.head.appendChild(style);
+      setFontFamily("CustomFont");
+
+      cleanupFont = () => {
+        document.head.removeChild(style);
+        URL.revokeObjectURL(objectUrl);
+        setFontFamily("sans-serif");
+      };
+    }, 500);
 
     return () => {
-      document.head.removeChild(style);
-      URL.revokeObjectURL(objectUrl);
-      setFontFamily("sans-serif");
+      clearTimeout(timer);
+      cleanupFont?.();
     };
-  }, [fontCacheRef, selectedPreset]);
+  }, [fontData, selectedPreset]);
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -518,7 +551,23 @@ export function MapPosterPreview({
       zoom: zoom,
       attributionControl: false,
       canvasContextAttributes: { preserveDrawingBuffer: true },
-      interactive: false,
+      interactive: true, // 始终 true 让 handler 对象存在，后续通过 effect 控制 enable/disable
+    });
+    console.log(
+      "[Map] created with interactive: true, dragPan:",
+      !!map.dragPan,
+      "isEnabled:",
+      map.dragPan?.isEnabled?.()
+    );
+
+    let isUserDragging = false;
+    map.on("dragstart", () => {
+      isUserDragging = true;
+      isDraggingRef.current = true;
+    });
+    map.on("dragend", () => {
+      isDraggingRef.current = false;
+      // 不重置 isUserDragging，留给 moveend 处理
     });
 
     map.on("load", () => {
@@ -539,9 +588,29 @@ export function MapPosterPreview({
       setIsLoaded(true);
     });
 
-    map.on("moveend", () => {
+    // 拖拽中实时同步坐标（300ms 节流，避免频繁 re-render）
+    let lastMoveCall = 0;
+    map.on("move", () => {
+      if (!isUserDragging) return;
+      const now = Date.now();
+      if (now - lastMoveCall < 300) return;
+      lastMoveCall = now;
       const center = map.getCenter();
-      onMoveEnd?.({ lat: center.lat, lon: center.lng });
+      onMoveRef.current?.({ lat: center.lat, lon: center.lng });
+    });
+
+    map.on("moveend", () => {
+      console.log(
+        "[Map] moveend fired, isUserDragging:",
+        isUserDragging,
+        "onMoveEnd:",
+        !!onMoveEndRef.current
+      );
+      if (!isUserDragging) return;
+      isUserDragging = false;
+      const center = map.getCenter();
+      onMoveRef.current?.({ lat: center.lat, lon: center.lng });
+      onMoveEndRef.current?.({ lat: center.lat, lon: center.lng });
     });
 
     mapRef.current = map;
@@ -554,12 +623,52 @@ export function MapPosterPreview({
   // 主题颜色变化：用 setPaintProperty，不调用 setStyle()
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return;
+    if (isDraggingRef.current) return; // 拖拽中跳过，避免 13 次 setPaintProperty 调用
     applyThemePaintProperties(mapRef.current, theme);
   }, [theme, isLoaded]);
+
+  // 交互能力切换（坐标模式可拖拽，搜索模式只读）
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+    const dragPan = mapRef.current.dragPan;
+    console.log(
+      `[Map] interactive toggle: ${interactive}, dragPan exists:`,
+      !!dragPan,
+      "isEnabled before:",
+      dragPan?.isEnabled?.()
+    );
+    if (interactive) {
+      dragPan?.enable();
+      mapRef.current.scrollZoom?.enable();
+      mapRef.current.doubleClickZoom?.enable();
+      mapRef.current.touchZoomRotate?.enable();
+      console.log("[Map] interactions enabled, isEnabled after:", dragPan?.isEnabled?.());
+    } else {
+      dragPan?.disable();
+      mapRef.current.scrollZoom?.disable();
+      mapRef.current.doubleClickZoom?.disable();
+      mapRef.current.touchZoomRotate?.disable();
+      console.log("[Map] interactions disabled, isEnabled after:", dragPan?.isEnabled?.());
+    }
+  }, [interactive, isLoaded]);
 
   // 位置变化：统一用 flyTo，天然有动画，不走 fitBounds
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return;
+
+    // 拖拽中跳过 flyTo：用户正在拖拽，flyTo 会打断交互并造成卡顿
+    if (isDraggingRef.current) return;
+
+    const currentCenter = mapRef.current.getCenter();
+    const targetLat = location.lat;
+    const targetLon = location.lon;
+    // 跳过 flyTo：地图已在此位置，避免 moveend → setState → flyTo 循环
+    if (
+      Math.abs(currentCenter.lat - targetLat) < 0.000001 &&
+      Math.abs(currentCenter.lng - targetLon) < 0.000001
+    ) {
+      return;
+    }
 
     const targetZoom = radius
       ? getZoomFromRadius(
@@ -571,7 +680,7 @@ export function MapPosterPreview({
       : zoom;
 
     mapRef.current.flyTo({
-      center: [location.lon, location.lat],
+      center: [targetLon, targetLat],
       zoom: targetZoom,
       essential: true,
       duration: 1200,
