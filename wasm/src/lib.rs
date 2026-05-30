@@ -1,6 +1,7 @@
 mod data_processor;
 mod projection;
 mod renderer;
+mod svg_renderer;
 mod types;
 mod utils;
 
@@ -9,6 +10,7 @@ use data_processor::{parse_polygons, parse_roads};
 use projection::{calculate_bounds, project_points_mut};
 use renderer::MapRenderer;
 use serde::Deserialize;
+use svg_renderer::SvgRenderer;
 use types::{RenderRequest, RenderResult};
 use wasm_bindgen::prelude::*;
 
@@ -133,6 +135,10 @@ pub struct BinaryRenderConfig {
     pub show_city: bool,
     #[serde(default = "types::default_true")]
     pub show_country: bool,
+    #[serde(default)]
+    pub export_format: Option<String>,
+    #[serde(default)]
+    pub svg_font_mode: Option<String>,
 }
 
 /// 主渲染函数 (二进制直读版本)
@@ -262,6 +268,18 @@ fn render_map_binary_internal(
         road_type_counts[5]
     ));
 
+    let export_format = config.export_format.as_deref().unwrap_or("png");
+    if export_format == "svg" {
+        return render_map_binary_svg(
+            roads_shards,
+            water_bin,
+            parks_bin,
+            config,
+            bounds,
+            font_data,
+        );
+    }
+
     // 3. 创建渲染器
     let text_pos = config.text_position.unwrap_or(types::TextPosition::Top);
     let mut renderer =
@@ -347,6 +365,7 @@ fn render_map_binary_internal(
     time_end("render_map_bin: draw_gradients");
 
     // 4. 绘制文字 (使用传入的字体数据)
+    time("render_map_bin: draw_text");
     if let Err(e) = renderer.draw_text(
         &config.display_city,
         &config.display_country,
@@ -359,6 +378,7 @@ fn render_map_binary_internal(
     ) {
         return RenderResult::error(format!("Failed to draw text: {}", e));
     }
+    time_end("render_map_bin: draw_text");
 
     // 5. 编码为 PNG
     time("render_map_bin: encode_png");
@@ -369,6 +389,110 @@ fn render_map_binary_internal(
     time_end("render_map_bin: encode_png");
 
     RenderResult::success(config.width, config.height, png_data)
+}
+
+fn render_map_binary_svg(
+    roads_shards: JsValue,
+    water_bin: &[f64],
+    parks_bin: &[f64],
+    config: BinaryRenderConfig,
+    bounds: types::BoundingBox,
+    font_data: &[u8],
+) -> RenderResult {
+    let text_pos = config.text_position.unwrap_or(types::TextPosition::Top);
+    let water_color = config.theme.water.clone();
+    let parks_color = config.theme.parks.clone();
+    let mut renderer =
+        SvgRenderer::new(config.width, config.height, config.theme, bounds, text_pos);
+
+    time("render_map_bin: draw_background");
+    renderer.draw_background();
+    time_end("render_map_bin: draw_background");
+
+    time("render_map_bin: draw_water");
+    renderer.draw_polygons_bin(water_bin, &water_color);
+    time_end("render_map_bin: draw_water");
+
+    time("render_map_bin: draw_parks");
+    renderer.draw_polygons_bin(parks_bin, &parks_color);
+    time_end("render_map_bin: draw_parks");
+
+    time("render_map_bin: draw_roads");
+    let road_width_scale = types::calculate_road_width_scale(
+        config.selected_size_height as f32,
+        config.frontend_scale,
+        config.road_width_boost,
+    );
+
+    let mut total_timings = [0.0; 6];
+
+    if js_sys::Array::is_array(&roads_shards) {
+        let shards_array = js_sys::Array::from(&roads_shards);
+        for shard_val in shards_array.iter() {
+            if let Some(shard_typed) = shard_val.dyn_ref::<js_sys::Float64Array>() {
+                let timings =
+                    renderer.draw_roads_bin_scaled(&shard_typed.to_vec(), road_width_scale);
+                for i in 0..6 {
+                    total_timings[i] += timings[i];
+                }
+            }
+        }
+    } else if let Some(shard_typed) = roads_shards.dyn_ref::<js_sys::Float64Array>() {
+        total_timings = renderer.draw_roads_bin_scaled(&shard_typed.to_vec(), road_width_scale);
+    }
+
+    time_end("render_map_bin: draw_roads");
+
+    log("render_map_bin: draw_roads breakdown:");
+    log(&format!("  Motorway: {:.2}ms", total_timings[0]));
+    log(&format!("  Primary: {:.2}ms", total_timings[1]));
+    log(&format!("  Secondary: {:.2}ms", total_timings[2]));
+    log(&format!("  Tertiary: {:.2}ms", total_timings[3]));
+    log(&format!("  Residential: {:.2}ms", total_timings[4]));
+    log(&format!("  Default: {:.2}ms", total_timings[5]));
+
+    if let Some(pois_data) = &config.pois {
+        if !pois_data.is_empty() && pois_data[0] as usize > 0 {
+            let mut projected_pois = pois_data.clone();
+            let poi_count = projected_pois[0] as usize;
+            for i in 0..poi_count {
+                let offset = 1 + i * 2;
+                let (proj_lon, proj_lat) =
+                    projection::project_point(projected_pois[offset], projected_pois[offset + 1]);
+                projected_pois[offset] = proj_lon;
+                projected_pois[offset + 1] = proj_lat;
+            }
+            time("render_map_bin: draw_pois");
+            renderer.draw_pois_bin_scaled(&projected_pois, 1.0);
+            time_end("render_map_bin: draw_pois");
+        }
+    }
+
+    time("render_map_bin: draw_gradients");
+    renderer.draw_gradients();
+    time_end("render_map_bin: draw_gradients");
+
+    time("render_map_bin: draw_text");
+    if let Err(e) = renderer.draw_text(
+        &config.display_city,
+        &config.display_country,
+        config.center.lat,
+        config.center.lon,
+        font_data,
+        config.show_city,
+        config.show_country,
+        config.show_coords,
+        config.svg_font_mode.as_deref().unwrap_or("embed") != "none",
+    ) {
+        return RenderResult::error(format!("Failed to draw SVG text: {}", e));
+    }
+    time_end("render_map_bin: draw_text");
+
+    time("render_map_bin: encode_svg");
+    let svg_data = renderer.finish();
+    time_end("render_map_bin: encode_svg");
+
+    RenderResult::success(config.width, config.height, svg_data)
 }
 
 /// 主渲染函数 (MessagePack 版本)
@@ -567,7 +691,8 @@ pub fn process_roads_bin_wasm(data: &[f64]) -> Result<js_sys::Float64Array, JsVa
         .map_err(|e| JsValue::from_str(&format!("Error parsing roads binary: {}", e)))?;
 
     // 预计算总长度，直接分配 Float64Array，避免中间 Vec 分配和复制
-    let total_len: usize = 1 + roads.iter()
+    let total_len: usize = 1 + roads
+        .iter()
         .map(|r| 2usize + r.coords.len() * 2)
         .sum::<usize>();
 
@@ -598,11 +723,16 @@ pub fn process_polygons_bin_wasm(data: &[f64]) -> Result<js_sys::Float64Array, J
         .map_err(|e| JsValue::from_str(&format!("Error parsing polygons binary: {}", e)))?;
 
     // 预计算总长度，直接分配 Float64Array，避免中间 Vec 分配和复制
-    let total_len: usize = 1 + polys.iter()
+    let total_len: usize = 1 + polys
+        .iter()
         .map(|p| {
-            2usize + p.exterior.len() * 2 + 1 + p.interiors.iter()
-                .map(|r| 1usize + r.len() * 2)
-                .sum::<usize>()
+            2usize
+                + p.exterior.len() * 2
+                + 1
+                + p.interiors
+                    .iter()
+                    .map(|r| 1usize + r.len() * 2)
+                    .sum::<usize>()
         })
         .sum::<usize>();
 

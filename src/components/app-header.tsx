@@ -27,7 +27,7 @@ const languageNames: Record<AvailableLanguageTag, string> = {
 interface AppHeaderProps {
   activeLang: AvailableLanguageTag;
   onLangChange: (lang: AvailableLanguageTag) => void;
-  onDownload: (scale: number) => void;
+  onDownload: (scale: number, format?: "png" | "svg") => void;
   isGenerating: boolean;
   locationLoading: boolean;
 }
@@ -147,6 +147,20 @@ export function AppHeader({
                 <span className="text-sm font-semibold">2X</span>
                 <span className="text-[12px] leading-tight">
                   {m.download_quality_2x_desc({}, localeOptions)}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDownload(1, "svg");
+                }}
+                className="w-full flex flex-col items-start gap-0.5 px-3 py-3 text-foreground hover:bg-primary hover:text-vanilla transition-colors cursor-pointer text-left"
+              >
+                <span className="text-sm font-semibold">
+                  {m.download_svg_export({}, localeOptions)}
+                </span>
+                <span className="text-[12px] leading-tight">
+                  {m.download_svg_export_desc({}, localeOptions)}
                 </span>
               </button>
             </div>

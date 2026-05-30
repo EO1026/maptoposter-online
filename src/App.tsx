@@ -50,6 +50,7 @@ interface LocalPosterSize extends PosterSize {
 
 // Worker task types
 type WorkerTaskType = "roads" | "polygons" | "pois" | "render";
+type ExportFormat = "png" | "svg";
 
 interface RenderOptions {
   roads_shards: Float64Array[];
@@ -991,7 +992,7 @@ export default function MapPosterGenerator() {
       });
   }, []);
 
-  const handleDownload = async (scale: number) => {
+  const handleDownload = async (scale: number, exportFormat: ExportFormat = "png") => {
     const generationStart = performance.now();
     setIsGenerating(true);
     setGenerationProgress(0);
@@ -1163,6 +1164,8 @@ export default function MapPosterGenerator() {
         show_coords: showCoords,
         show_city: showCity,
         show_country: showCountry,
+        export_format: exportFormat,
+        svg_font_mode: "embed",
       };
       logClientTiming("processing", "prepareRenderConfig", {
         total: performance.now() - configStart,
@@ -1200,7 +1203,7 @@ export default function MapPosterGenerator() {
 
       // 执行渲染任务
       const renderStart = performance.now();
-      const pngData = await runInWorker(
+      const renderedData = await runInWorker(
         workers[0 % numWorkers],
         "render",
         renderOptions,
@@ -1209,7 +1212,7 @@ export default function MapPosterGenerator() {
       );
       logClientTiming("render", "roundTrip", { total: performance.now() - renderStart });
 
-      if (pngData) {
+      if (renderedData) {
         setGenerationProgress(97);
         currentStepRef.current = "step_downloading_file";
         setGenerationStep(m.step_downloading_file());
@@ -1222,11 +1225,12 @@ export default function MapPosterGenerator() {
         await yieldMainThread();
 
         const downloadStart = performance.now();
-        const blob = new Blob([pngData as BlobPart], { type: "image/png" });
+        const mimeType = exportFormat === "svg" ? "image/svg+xml;charset=utf-8" : "image/png";
+        const blob = new Blob([renderedData as BlobPart], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `${(customTitle || location.city).toLowerCase().replace(/\s+/g, "-")}-map-poster.png`;
+        link.download = `${(customTitle || location.city).toLowerCase().replace(/\s+/g, "-")}-map-poster.${exportFormat}`;
         link.click();
         logClientTiming("download", "file", { total: performance.now() - downloadStart });
         logClientTiming("generation", "total", { total: performance.now() - generationStart });
@@ -1321,7 +1325,7 @@ export default function MapPosterGenerator() {
         <AppHeader
           activeLang={activeLang}
           onLangChange={handleLanguageChange}
-          onDownload={(scale) => handleDownload(scale)}
+          onDownload={(scale, format) => handleDownload(scale, format)}
           isGenerating={isGenerating}
           locationLoading={locationLoading}
         />

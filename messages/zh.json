@@ -186,6 +186,8 @@
 	"star_hint": "我真的很需要你的 Star 🥰",
 	"download_quality_1x_desc": "社交分享、手机壁纸、在线展示、文案配图",
 	"download_quality_2x_desc": "高清打印、高分屏壁纸、追求极致视觉体验，耗时为 1X 的 2.5 倍以上",
+	"download_svg_export": "SVG 导出",
+	"download_svg_export_desc": "矢量格式，可无限缩放，可能与 PNG 效果有细微差异",
 	"recommended": "推荐",
 	"error_modal_title": "发生错误",
 	"error_modal_error_type": "错误类型",
