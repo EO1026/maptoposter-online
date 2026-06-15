@@ -30,6 +30,7 @@ export interface Location {
 }
 
 export type PoiSource = "off" | "overpass" | "custom";
+export type PoiShape = "circle" | "star" | "heart";
 
 export interface CustomPOITypeCategory {
   id: string;

@@ -9,7 +9,7 @@ use tiny_skia::{
 };
 
 use crate::projection;
-use crate::types::{BoundingBox, PinThemeConfig, PinThemeStyle, PolyFeature, Road, RoadType, TextPosition, Theme};
+use crate::types::{BoundingBox, PinThemeConfig, PinThemeStyle, PoiShape, PolyFeature, Road, RoadType, TextPosition, Theme};
 use crate::utils::{calculate_font_size, format_city_name, format_coordinates, log, parse_hex_color};
 
 /// 地图渲染引擎
@@ -495,11 +495,11 @@ impl MapRenderer {
     /// 绘制 POI 圆点（使用 POI 结构体数组）
     pub fn draw_pois(&mut self, pois: &[crate::types::POI], poi_ratio: f32) {
         // 【优化】委托给 scaled 版本，消除重复代码
-        self.draw_pois_scaled(pois, poi_ratio);
+        self.draw_pois_scaled(pois, poi_ratio, PoiShape::Circle);
     }
 
     /// 绘制 POI 圆点（使用 POI 结构体数组，带画布比例缩放）
-    pub fn draw_pois_scaled(&mut self, pois: &[crate::types::POI], poi_ratio: f32) {
+    pub fn draw_pois_scaled(&mut self, pois: &[crate::types::POI], poi_ratio: f32, poi_shape: PoiShape) {
         if pois.is_empty() {
             return;
         }
@@ -562,7 +562,7 @@ impl MapRenderer {
             }
 
             grid.entry((cx, cy)).or_default().push((screen_x, screen_y));
-            pb.push_circle(screen_x, screen_y, poi_radius);
+            push_poi_shape(&mut pb, poi_shape, screen_x, screen_y, poi_radius);
             rendered_count += 1;
         }
 
@@ -586,13 +586,13 @@ impl MapRenderer {
 
     /// 绘制 POI 圆点（二进制直读版本）
     /// 数据格式：[poi_count, x1, y1, x2, y2, ...]
-    pub fn draw_pois_bin(&mut self, data: &[f64], poi_ratio: f32) {
-        self.draw_pois_bin_scaled(data, poi_ratio);
+    pub fn draw_pois_bin(&mut self, data: &[f64], poi_ratio: f32, poi_shape: PoiShape) {
+        self.draw_pois_bin_scaled(data, poi_ratio, poi_shape);
     }
 
     /// 绘制 POI 圆点（二进制直读版本，带画布比例缩放）
     /// 数据格式：[poi_count, x1, y1, x2, y2, ...]
-    pub fn draw_pois_bin_scaled(&mut self, data: &[f64], poi_ratio: f32) {
+    pub fn draw_pois_bin_scaled(&mut self, data: &[f64], poi_ratio: f32, poi_shape: PoiShape) {
         if data.is_empty() || data[0] as usize == 0 {
             return;
         }
@@ -672,7 +672,7 @@ impl MapRenderer {
 
                     if !too_close {
                         grid.entry((cx, cy)).or_default().push((screen_x, screen_y));
-                        pb.push_circle(screen_x, screen_y, poi_radius);
+                        push_poi_shape(&mut pb, poi_shape, screen_x, screen_y, poi_radius);
                         rendered_count += 1;
                     }
                 }
@@ -707,7 +707,12 @@ impl MapRenderer {
         );
     }
 
-    pub fn draw_custom_pois(&mut self, pois: &[crate::types::CustomPOI], pin_theme_config: &PinThemeConfig) {
+    pub fn draw_custom_pois(
+        &mut self,
+        pois: &[crate::types::CustomPOI],
+        pin_theme_config: &PinThemeConfig,
+        poi_shape: PoiShape,
+    ) {
         if pois.is_empty() {
             return;
         }
@@ -772,6 +777,7 @@ impl MapRenderer {
                 screen_y,
                 marker_radius,
                 pin_theme_config,
+                poi_shape,
                 &mut shadow_paint,
                 &badge_paint,
                 &mut rim_paint,
@@ -853,11 +859,24 @@ impl MapRenderer {
         screen_y: f32,
         marker_radius: f32,
         pin_theme_config: &PinThemeConfig,
+        poi_shape: PoiShape,
         shadow_paint: &mut Paint,
         badge_paint: &Paint,
         rim_paint: &mut Paint,
         highlight_paint: &mut Paint,
     ) {
+        if poi_shape != PoiShape::Circle {
+            self.draw_simple_shape_badge(
+                screen_x,
+                screen_y,
+                marker_radius,
+                poi_shape,
+                pin_theme_config,
+                shadow_paint,
+                badge_paint,
+            );
+            return;
+        }
         if pin_theme_config.gradient_enabled {
             self.draw_gradient_pin_badge(
                 screen_x,
@@ -877,6 +896,27 @@ impl MapRenderer {
                 highlight_paint,
             );
         }
+    }
+
+    fn draw_simple_shape_badge(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        marker_radius: f32,
+        poi_shape: PoiShape,
+        pin_theme_config: &PinThemeConfig,
+        shadow_paint: &mut Paint,
+        badge_paint: &Paint,
+    ) {
+        shadow_paint.set_color(Color::from_rgba(0.0, 0.0, 0.0, pin_theme_config.shadow_alpha).unwrap());
+        self.fill_shape(
+            poi_shape,
+            screen_x,
+            screen_y + marker_radius * pin_theme_config.shadow_offset_y_scale,
+            marker_radius * pin_theme_config.shadow_radius_scale,
+            shadow_paint,
+        );
+        self.fill_shape(poi_shape, screen_x, screen_y, marker_radius, badge_paint);
     }
 
     fn draw_solid_pin_badge(
@@ -1108,6 +1148,15 @@ impl MapRenderer {
     fn fill_circle(&mut self, x: f32, y: f32, radius: f32, paint: &Paint) {
         let mut pb = PathBuilder::new();
         pb.push_circle(x, y, radius);
+        if let Some(path) = pb.finish() {
+            self.pixmap
+                .fill_path(&path, paint, FillRule::Winding, Transform::identity(), None);
+        }
+    }
+
+    fn fill_shape(&mut self, shape: PoiShape, x: f32, y: f32, radius: f32, paint: &Paint) {
+        let mut pb = PathBuilder::new();
+        push_poi_shape(&mut pb, shape, x, y, radius);
         if let Some(path) = pb.finish() {
             self.pixmap
                 .fill_path(&path, paint, FillRule::Winding, Transform::identity(), None);
@@ -1847,6 +1896,51 @@ fn build_custom_poi_icon_path(
     }
 
     builder.finish()
+}
+
+fn push_poi_shape(builder: &mut PathBuilder, shape: PoiShape, cx: f32, cy: f32, radius: f32) {
+    match shape {
+        PoiShape::Circle => {
+            builder.push_circle(cx, cy, radius);
+        }
+        PoiShape::Star => {
+            let inner_radius = radius * 0.5;
+            let start_angle = -std::f32::consts::FRAC_PI_2;
+            for i in 0..10 {
+                let angle = start_angle + i as f32 * std::f32::consts::PI / 5.0;
+                let r = if i % 2 == 0 { radius } else { inner_radius };
+                let x = cx + angle.cos() * r;
+                let y = cy + angle.sin() * r;
+                if i == 0 {
+                    builder.move_to(x, y);
+                } else {
+                    builder.line_to(x, y);
+                }
+            }
+            builder.close();
+        }
+        PoiShape::Heart => {
+            let top_y = cy - radius * 0.2;
+            builder.move_to(cx, cy + radius);
+            builder.cubic_to(
+                cx - radius * 1.0,
+                cy + radius * 0.45,
+                cx - radius * 1.05,
+                cy - radius * 0.35,
+                cx,
+                top_y,
+            );
+            builder.cubic_to(
+                cx + radius * 1.05,
+                cy - radius * 0.35,
+                cx + radius * 1.0,
+                cy + radius * 0.45,
+                cx,
+                cy + radius,
+            );
+            builder.close();
+        }
+    }
 }
 
 // ── [Gamma校正] sRGB ↔ 线性光转换工具函数 ────────────────────────────────────

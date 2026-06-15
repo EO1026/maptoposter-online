@@ -24,6 +24,7 @@ import {
   type MapColors,
   MAP_THEMES as THEMES,
   type Location,
+  type PoiShape,
   type PoiSource,
 } from "@/lib/types";
 import { mapDataService } from "./services/map-data";
@@ -123,110 +124,290 @@ interface PinThemeConfig {
 const INTERNAL_PIN_THEME_STYLE: PinThemeStyle = "puff";
 // 内部测试用图钉主题参数表。
 // 修改这里的数值后，保存并刷新页面即可重新导出对比效果；仅调这些前端参数时，不需要重新打包 wasm。
-const INTERNAL_PIN_THEME_CONFIGS: Record<PinThemeStyle, PinThemeConfig> = {
+const INTERNAL_PIN_THEME_CONFIGS: Record<PinThemeStyle, Record<PoiShape, PinThemeConfig>> = {
   puff: {
-    style: "puff",
-    // --- gradient-active params ---
-    gradientEnabled: true,
-    shadowAlpha: 0.32,
-    shadowOffsetYScale: 0.32,
-    shadowRadiusScale: 0.92,
-    shadowSpread: 1.2,
-    shadowColor: "#000000",
-    poiRatio: 0.016,
-    bodyLighten: 0.12,
-    bodyDarken: 0.85,
-    highlightAlpha: 0.32,
-    highlightOffsetXScale: -0.22,
-    highlightOffsetYScale: -0.28,
-    highlightRadiusScale: 0.72,
-    highlightSpread: 1.0,
-    iconScale: 0.65,
-    fallbackDotScale: 0.28,
-    // --- solid-only fallback (dead when gradientEnabled=true) ---
-    rimDarken: 0.82,
-    innerBodyDarken: 0.96,
-    innerBodyScale: 0.88,
-    secondaryHighlightAlpha: 0,
-    secondaryHighlightOffsetXScale: 0,
-    secondaryHighlightOffsetYScale: 0,
-    secondaryHighlightRadiusScale: 0,
-    innerShadowAlpha: 0.1,
-    innerShadowOffsetYScale: 0.22,
-    innerShadowRadiusScale: 0.78,
+    circle: {
+      style: "puff",
+      // --- gradient-active params ---
+      gradientEnabled: true,
+      shadowAlpha: 0.32, // 控制阴影透明度
+      shadowOffsetYScale: 0.32, // 控制阴影向下偏移
+      shadowRadiusScale: 0.92, // 值越大，阴影范围越大，通常会显得更“糊”
+      shadowSpread: 1.2, // 值越大，阴影越松、越柔
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+      bodyLighten: 0.12,
+      bodyDarken: 0.85,
+      highlightAlpha: 0.32,
+      highlightOffsetXScale: -0.22,
+      highlightOffsetYScale: -0.28,
+      highlightRadiusScale: 0.72,
+      highlightSpread: 1.0,
+      iconScale: 0.65,
+      fallbackDotScale: 0.28,
+      // --- solid-only fallback (dead when gradientEnabled=true) ---
+      rimDarken: 0.82,
+      innerBodyDarken: 0.96,
+      innerBodyScale: 0.88,
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      innerShadowAlpha: 0.1,
+      innerShadowOffsetYScale: 0.22,
+      innerShadowRadiusScale: 0.78,
+    },
+    star: {
+      style: "puff",
+      gradientEnabled: true,
+      shadowAlpha: 0.1, // 控制阴影透明度
+      shadowOffsetYScale: 0.1, // 控制阴影向下偏移
+      shadowRadiusScale: 1.05, // 值越大，阴影范围越大，通常会显得更“糊”
+      shadowSpread: 1.1, // 值越大，阴影越松、越柔
+      shadowColor: "#000000",
+      poiRatio: 0.02,
+      bodyLighten: 0.12,
+      bodyDarken: 0.85,
+      highlightAlpha: 0.32,
+      highlightOffsetXScale: -0.22,
+      highlightOffsetYScale: -0.28,
+      highlightRadiusScale: 0.72,
+      highlightSpread: 1.0,
+      iconScale: 0.45,
+      fallbackDotScale: 0.24,
+      rimDarken: 0.82,
+      innerBodyDarken: 0.96,
+      innerBodyScale: 0.88,
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      innerShadowAlpha: 0.1,
+      innerShadowOffsetYScale: 0.22,
+      innerShadowRadiusScale: 0.78,
+    },
+    heart: {
+      style: "puff",
+      gradientEnabled: true,
+      shadowAlpha: 0.32,
+      shadowOffsetYScale: 0.32,
+      shadowRadiusScale: 0.92,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+      bodyLighten: 0.12,
+      bodyDarken: 0.85,
+      highlightAlpha: 0.32,
+      highlightOffsetXScale: -0.22,
+      highlightOffsetYScale: -0.28,
+      highlightRadiusScale: 0.72,
+      highlightSpread: 1.0,
+      iconScale: 0.5,
+      fallbackDotScale: 0.22,
+      rimDarken: 0.82,
+      innerBodyDarken: 0.96,
+      innerBodyScale: 0.88,
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      innerShadowAlpha: 0.1,
+      innerShadowOffsetYScale: 0.22,
+      innerShadowRadiusScale: 0.78,
+    },
   },
 
+  // 暂不启用
   badge: {
-    style: "badge",
-    iconScale: 0.78,
-    fallbackDotScale: 0.28,
-    // 阴影：扁平徽章，阴影小而实，不飘
-    shadowAlpha: 0.22, // 0.18→0.22，徽章阴影清晰
-    shadowOffsetYScale: 0.14, // 0.18→0.14，偏移略小
-    shadowRadiusScale: 0.6, // 1.0→0.60，硬质阴影，收紧
-    // 边缘：压制感，像冲压金属边缘
-    rimDarken: 0.6, // 0.74→0.60，边缘明显更暗
-    innerBodyDarken: 0.82, // 0.9→0.82，内层主体明显压暗，凹入感
-    innerBodyScale: 0.88,
-    // 高光：极小且弱，接近哑光珐琅，仅有轻微光泽
-    highlightAlpha: 0.1, // 0.20→0.10，哑光不该有强高光
-    highlightOffsetXScale: -0.14,
-    highlightOffsetYScale: -0.26,
-    highlightRadiusScale: 0.32, // 0.48→0.32，高光很小很紧
-    // 次级高光：无
-    secondaryHighlightAlpha: 0,
-    secondaryHighlightOffsetXScale: 0,
-    secondaryHighlightOffsetYScale: 0,
-    secondaryHighlightRadiusScale: 0,
-    // 内阴影：无，badge 是平的
-    innerShadowAlpha: 0,
-    innerShadowOffsetYScale: 0,
-    innerShadowRadiusScale: 0,
-    gradientEnabled: false,
-    bodyLighten: 0.12,
-    bodyDarken: 0.18,
-    highlightSpread: 1.0,
-    shadowSpread: 1.2,
-    shadowColor: "#000000",
-    poiRatio: 0.016,
+    circle: {
+      style: "badge",
+      iconScale: 0.78,
+      fallbackDotScale: 0.28,
+      // 阴影：扁平徽章，阴影小而实，不飘
+      shadowAlpha: 0.22, // 0.18→0.22，徽章阴影清晰
+      shadowOffsetYScale: 0.14, // 0.18→0.14，偏移略小
+      shadowRadiusScale: 0.6, // 1.0→0.60，硬质阴影，收紧
+      // 边缘：压制感，像冲压金属边缘
+      rimDarken: 0.6, // 0.74→0.60，边缘明显更暗
+      innerBodyDarken: 0.82, // 0.9→0.82，内层主体明显压暗，凹入感
+      innerBodyScale: 0.88,
+      // 高光：极小且弱，接近哑光珐琅，仅有轻微光泽
+      highlightAlpha: 0.1, // 0.20→0.10，哑光不该有强高光
+      highlightOffsetXScale: -0.14,
+      highlightOffsetYScale: -0.26,
+      highlightRadiusScale: 0.32, // 0.48→0.32，高光很小很紧
+      // 次级高光：无
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      // 内阴影：无，badge 是平的
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
+    star: {
+      style: "badge",
+      iconScale: 0.64,
+      fallbackDotScale: 0.24,
+      shadowAlpha: 0.22,
+      shadowOffsetYScale: 0.14,
+      shadowRadiusScale: 0.6,
+      rimDarken: 0.6,
+      innerBodyDarken: 0.82,
+      innerBodyScale: 0.88,
+      highlightAlpha: 0.1,
+      highlightOffsetXScale: -0.14,
+      highlightOffsetYScale: -0.26,
+      highlightRadiusScale: 0.32,
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
+    heart: {
+      style: "badge",
+      iconScale: 0.6,
+      fallbackDotScale: 0.22,
+      shadowAlpha: 0.22,
+      shadowOffsetYScale: 0.14,
+      shadowRadiusScale: 0.6,
+      rimDarken: 0.6,
+      innerBodyDarken: 0.82,
+      innerBodyScale: 0.88,
+      highlightAlpha: 0.1,
+      highlightOffsetXScale: -0.14,
+      highlightOffsetYScale: -0.26,
+      highlightRadiusScale: 0.32,
+      secondaryHighlightAlpha: 0,
+      secondaryHighlightOffsetXScale: 0,
+      secondaryHighlightOffsetYScale: 0,
+      secondaryHighlightRadiusScale: 0,
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
   },
 
   pinhead: {
-    style: "pinhead",
-    iconScale: 0.78,
-    fallbackDotScale: 0.28,
-    // 阴影：硬质球体投影，清晰
-    shadowAlpha: 0.24, // 0.20→0.24
-    shadowOffsetYScale: 0.18,
-    shadowRadiusScale: 0.8, // 0.96→0.80，玻璃球阴影较实
-    // 边缘：玻璃球边缘暗部很重，折射造成深色边圈
-    rimDarken: 0.44, // 0.62→0.44，边缘显著更暗
-    innerBodyDarken: 0.92, // 0.9→0.92，内部略微暗，背景色透过玻璃
-    innerBodyScale: 0.9, // 0.88→0.90
-    // 主高光：强且集中，镜面反射点，偏左上
-    highlightAlpha: 0.38, // 0.26→0.38，玻璃主高光要强
-    highlightOffsetXScale: -0.22, // -0.18→-0.22
-    highlightOffsetYScale: -0.32, // -0.28→-0.32，更偏顶部
-    highlightRadiusScale: 0.28, // 0.42→0.28，高光小且集中，镜面感
-    // 次级高光：右下环境光反射，玻璃球特有
-    secondaryHighlightAlpha: 0.2, // 0.14→0.20，加强，模拟底部透光
-    secondaryHighlightOffsetXScale: 0.16, // 0.10→0.16，更偏右
-    secondaryHighlightOffsetYScale: 0.14, // 0.08→0.14，更偏下
-    secondaryHighlightRadiusScale: 0.48, // 0.62→0.48，比主高光大但仍集中
-    // 内阴影：无
-    innerShadowAlpha: 0,
-    innerShadowOffsetYScale: 0,
-    innerShadowRadiusScale: 0,
-    gradientEnabled: false,
-    bodyLighten: 0.12,
-    bodyDarken: 0.18,
-    highlightSpread: 1.0,
-    shadowSpread: 1.2,
-    shadowColor: "#000000",
-    poiRatio: 0.016,
+    circle: {
+      style: "pinhead",
+      iconScale: 0.78,
+      fallbackDotScale: 0.28,
+      // 阴影：硬质球体投影，清晰
+      shadowAlpha: 0.24, // 0.20→0.24
+      shadowOffsetYScale: 0.18,
+      shadowRadiusScale: 0.8, // 0.96→0.80，玻璃球阴影较实
+      // 边缘：玻璃球边缘暗部很重，折射造成深色边圈
+      rimDarken: 0.44, // 0.62→0.44，边缘显著更暗
+      innerBodyDarken: 0.92, // 0.9→0.92，内部略微暗，背景色透过玻璃
+      innerBodyScale: 0.9, // 0.88→0.90
+      // 主高光：强且集中，镜面反射点，偏左上
+      highlightAlpha: 0.38, // 0.26→0.38，玻璃主高光要强
+      highlightOffsetXScale: -0.22, // -0.18→-0.22
+      highlightOffsetYScale: -0.32, // -0.28→-0.32，更偏顶部
+      highlightRadiusScale: 0.28, // 0.42→0.28，高光小且集中，镜面感
+      // 次级高光：右下环境光反射，玻璃球特有
+      secondaryHighlightAlpha: 0.2, // 0.14→0.20，加强，模拟底部透光
+      secondaryHighlightOffsetXScale: 0.16, // 0.10→0.16，更偏右
+      secondaryHighlightOffsetYScale: 0.14, // 0.08→0.14，更偏下
+      secondaryHighlightRadiusScale: 0.48, // 0.62→0.48，比主高光大但仍集中
+      // 内阴影：无
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
+    star: {
+      style: "pinhead",
+      iconScale: 0.64,
+      fallbackDotScale: 0.24,
+      shadowAlpha: 0.24,
+      shadowOffsetYScale: 0.18,
+      shadowRadiusScale: 0.8,
+      rimDarken: 0.44,
+      innerBodyDarken: 0.92,
+      innerBodyScale: 0.9,
+      highlightAlpha: 0.38,
+      highlightOffsetXScale: -0.22,
+      highlightOffsetYScale: -0.32,
+      highlightRadiusScale: 0.28,
+      secondaryHighlightAlpha: 0.2,
+      secondaryHighlightOffsetXScale: 0.16,
+      secondaryHighlightOffsetYScale: 0.14,
+      secondaryHighlightRadiusScale: 0.48,
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
+    heart: {
+      style: "pinhead",
+      iconScale: 0.58,
+      fallbackDotScale: 0.22,
+      shadowAlpha: 0.24,
+      shadowOffsetYScale: 0.18,
+      shadowRadiusScale: 0.8,
+      rimDarken: 0.44,
+      innerBodyDarken: 0.92,
+      innerBodyScale: 0.9,
+      highlightAlpha: 0.38,
+      highlightOffsetXScale: -0.22,
+      highlightOffsetYScale: -0.32,
+      highlightRadiusScale: 0.28,
+      secondaryHighlightAlpha: 0.2,
+      secondaryHighlightOffsetXScale: 0.16,
+      secondaryHighlightOffsetYScale: 0.14,
+      secondaryHighlightRadiusScale: 0.48,
+      innerShadowAlpha: 0,
+      innerShadowOffsetYScale: 0,
+      innerShadowRadiusScale: 0,
+      gradientEnabled: false,
+      bodyLighten: 0.12,
+      bodyDarken: 0.18,
+      highlightSpread: 1.0,
+      shadowSpread: 1.2,
+      shadowColor: "#000000",
+      poiRatio: 0.016,
+    },
   },
 };
-const INTERNAL_PIN_THEME_CONFIG = INTERNAL_PIN_THEME_CONFIGS[INTERNAL_PIN_THEME_STYLE];
 
 interface RenderOptions {
   roads_shards: Float64Array[];
@@ -568,9 +749,11 @@ export default function MapPosterGenerator() {
   const [showCountry, setShowCountry] = useState(true);
   const [enableRoadMaskOptimization, setEnableRoadMaskOptimization] = useState(true);
   const [poiSource, setPoiSource] = useState<PoiSource>("off");
+  const [poiShape, setPoiShape] = useState<PoiShape>("circle");
   const [customPois, setCustomPois] = useState<CustomPOI[]>([]);
   const [amapApiKey, setAmapApiKey] = useState("");
   const [isPoiDialogOpen, setIsPoiDialogOpen] = useState(false);
+  const internalPinThemeConfig = INTERNAL_PIN_THEME_CONFIGS[INTERNAL_PIN_THEME_STYLE][poiShape];
 
   // Persistence Handling
   const isRestored = useRef(false);
@@ -636,6 +819,7 @@ export default function MapPosterGenerator() {
       showCountry,
       enableRoadMaskOptimization,
       poiSource,
+      poiShape,
       customPois,
       amapApiKey,
     };
@@ -673,6 +857,7 @@ export default function MapPosterGenerator() {
     showCountry,
     enableRoadMaskOptimization,
     poiSource,
+    poiShape,
     customPois,
     amapApiKey,
   ]);
@@ -719,6 +904,13 @@ export default function MapPosterGenerator() {
           setPoiSource(config.poiSource);
         } else if (typeof config.showPois === "boolean") {
           setPoiSource(config.showPois ? "overpass" : "off");
+        }
+        if (
+          config.poiShape === "circle" ||
+          config.poiShape === "star" ||
+          config.poiShape === "heart"
+        ) {
+          setPoiShape(config.poiShape);
         }
         if (Array.isArray(config.customPois)) {
           setCustomPois(config.customPois);
@@ -1423,6 +1615,7 @@ export default function MapPosterGenerator() {
               })),
             }
           : {}),
+        poi_shape: poiShape,
         show_coords: showCoords,
         show_city: showCity,
         show_country: showCountry,
@@ -1430,9 +1623,9 @@ export default function MapPosterGenerator() {
         export_format: exportFormat,
         svg_font_mode: "embed",
         pin_theme_config: {
-          ...INTERNAL_PIN_THEME_CONFIG,
+          ...internalPinThemeConfig,
           // 选择自动时，因为没有icon，所以需要更小的poi圆点
-          poiRatio: poiSource === "overpass" ? 0.008 : INTERNAL_PIN_THEME_CONFIG.poiRatio,
+          poiRatio: poiSource === "overpass" ? 0.008 : internalPinThemeConfig.poiRatio,
         },
       };
       logClientTiming("processing", "prepareRenderConfig", {
@@ -1525,6 +1718,7 @@ export default function MapPosterGenerator() {
         Theme: selectedTheme.id,
         Font: customFont ? `Custom (${fontFileName})` : selectedPreset,
         "POI Source": poiSource,
+        "POI Shape": poiShape,
         "Custom POIs": String(customPois.length),
         "Show Coords": String(showCoords),
         "Show City": String(showCity),
@@ -1561,13 +1755,6 @@ export default function MapPosterGenerator() {
   };
 
   useDynamicFont(activeLang);
-
-  const poiSourceLabel =
-    poiSource === "custom"
-      ? m.poi_source_custom()
-      : poiSource === "overpass"
-        ? m.poi_source_overpass()
-        : m.poi_source_off();
 
   const navSections = useMemo<NavSection[]>(
     () => [
@@ -1730,10 +1917,11 @@ export default function MapPosterGenerator() {
                 <div id="section-custom-pois" ref={setSectionRef("section-custom-pois")}>
                   <CustomPOISettings
                     customPoiCount={customPois.length}
-                    poiSourceLabel={poiSourceLabel}
                     poiSource={poiSource}
+                    poiShape={poiShape}
                     onManageClick={() => setIsPoiDialogOpen(true)}
                     onPoiSourceChange={setPoiSource}
+                    onPoiShapeChange={setPoiShape}
                   />
                 </div>
 

@@ -130,6 +130,8 @@ pub struct BinaryRenderConfig {
     pub pois: Option<Vec<f64>>, // [poi_count, x1, y1, x2, y2, ...]
     #[serde(default)]
     pub custom_pois: Option<Vec<types::CustomPOI>>,
+    #[serde(default = "types::default_poi_shape")]
+    pub poi_shape: types::PoiShape,
     // 文本显示开关
     #[serde(default = "types::default_true")]
     pub show_coords: bool,
@@ -322,13 +324,13 @@ fn render_map_binary_internal(
     if let Some(custom_pois) = &config.custom_pois {
         if !custom_pois.is_empty() {
             time("render_map_bin: draw_custom_pois");
-            renderer.draw_custom_pois(custom_pois, &config.pin_theme_config);
+            renderer.draw_custom_pois(custom_pois, &config.pin_theme_config, config.poi_shape);
             time_end("render_map_bin: draw_custom_pois");
         }
     } else if let Some(pois_data) = &config.pois {
         if !pois_data.is_empty() && pois_data[0] as usize > 0 {
             time("render_map_bin: draw_pois");
-            renderer.draw_pois_bin(pois_data, config.pin_theme_config.poi_ratio);
+            renderer.draw_pois_bin(pois_data, config.pin_theme_config.poi_ratio, config.poi_shape);
             time_end("render_map_bin: draw_pois");
         }
     }
@@ -436,13 +438,13 @@ fn render_map_binary_svg(
     if let Some(custom_pois) = &config.custom_pois {
         if !custom_pois.is_empty() {
             time("render_map_bin: draw_custom_pois");
-            renderer.draw_custom_pois(custom_pois, &config.pin_theme_config);
+            renderer.draw_custom_pois(custom_pois, &config.pin_theme_config, config.poi_shape);
             time_end("render_map_bin: draw_custom_pois");
         }
     } else if let Some(pois_data) = &config.pois {
         if !pois_data.is_empty() && pois_data[0] as usize > 0 {
             time("render_map_bin: draw_pois");
-            renderer.draw_pois_bin_scaled(pois_data, config.pin_theme_config.poi_ratio);
+            renderer.draw_pois_bin_scaled(pois_data, config.pin_theme_config.poi_ratio, config.poi_shape);
             time_end("render_map_bin: draw_pois");
         }
     }

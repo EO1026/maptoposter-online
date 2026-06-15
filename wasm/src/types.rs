@@ -63,6 +63,16 @@ pub enum PinThemeStyle {
     Pinhead,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PoiShape {
+    Circle,
+    Star,
+    Heart,
+}
+
+pub fn default_poi_shape() -> PoiShape { PoiShape::Circle }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PinThemeConfig {

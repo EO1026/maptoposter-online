@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use tiny_skia::Color;
 
 use crate::projection;
-use crate::types::{BoundingBox, PinThemeConfig, PinThemeStyle, RoadType, TextPosition, Theme};
+use crate::types::{BoundingBox, PinThemeConfig, PinThemeStyle, PoiShape, RoadType, TextPosition, Theme};
 use crate::utils::{calculate_font_size, format_city_name, format_coordinates, parse_hex_color};
 
 pub struct SvgRenderer {
@@ -256,7 +256,7 @@ impl SvgRenderer {
         }
     }
 
-    pub fn draw_pois_bin_scaled(&mut self, data: &[f64], poi_ratio: f32) {
+    pub fn draw_pois_bin_scaled(&mut self, data: &[f64], poi_ratio: f32, poi_shape: PoiShape) {
         if data.is_empty() || data[0] as usize == 0 {
             return;
         }
@@ -321,10 +321,8 @@ impl SvgRenderer {
 
             grid.entry((cx, cy)).or_default().push((screen_x, screen_y));
             self.svg.push_str(&format!(
-                r#"<circle cx="{}" cy="{}" r="{}"/>"#,
-                fmt1(screen_x),
-                fmt1(screen_y),
-                fmt2(poi_radius)
+                r#"<path d="{}"/>"#,
+                build_poi_shape_path_data(poi_shape, screen_x, screen_y, poi_radius)
             ));
             rendered_count += 1;
         }
@@ -336,6 +334,7 @@ impl SvgRenderer {
         &mut self,
         pois: &[crate::types::CustomPOI],
         pin_theme_config: &PinThemeConfig,
+        poi_shape: PoiShape,
     ) {
         if pois.is_empty() {
             return;
@@ -384,7 +383,9 @@ impl SvgRenderer {
             }
 
             grid.entry((cx, cy)).or_default().push((screen_x, screen_y));
-            if pin_theme_config.gradient_enabled {
+            if poi_shape != PoiShape::Circle {
+                self.push_simple_shape_badge_svg(screen_x, screen_y, marker_radius, poi_shape, pin_theme_config);
+            } else if pin_theme_config.gradient_enabled {
                 self.push_gradient_pin_badge_svg(screen_x, screen_y, marker_radius, pin_theme_config);
             } else {
                 self.push_solid_pin_badge_svg(screen_x, screen_y, marker_radius, pin_theme_config);
@@ -858,6 +859,28 @@ impl SvgRenderer {
         }
     }
 
+    fn push_simple_shape_badge_svg(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        marker_radius: f32,
+        poi_shape: PoiShape,
+        pin_theme_config: &PinThemeConfig,
+    ) {
+        let shadow_path = build_poi_shape_path_data(
+            poi_shape,
+            screen_x,
+            screen_y + marker_radius * pin_theme_config.shadow_offset_y_scale,
+            marker_radius * pin_theme_config.shadow_radius_scale,
+        );
+        let body_path = build_poi_shape_path_data(poi_shape, screen_x, screen_y, marker_radius);
+        self.svg.push_str(&format!(
+            r##"<path d="{shadow_path}" fill="#000000" fill-opacity="{}"/><path d="{body_path}" fill="{}"/>"##,
+            fmt2(pin_theme_config.shadow_alpha),
+            escape_attr(&self.theme.poi_color)
+        ));
+    }
+
     fn push_solid_pin_badge_svg(
         &mut self,
         screen_x: f32,
@@ -978,6 +1001,57 @@ impl SvgRenderer {
                 ));
             }
         }
+    }
+}
+
+fn build_poi_shape_path_data(shape: PoiShape, cx: f32, cy: f32, radius: f32) -> String {
+    match shape {
+        PoiShape::Circle => format!(
+            "M {} {} a {} {} 0 1 0 {} 0 a {} {} 0 1 0 -{} 0",
+            fmt1(cx - radius),
+            fmt1(cy),
+            fmt2(radius),
+            fmt2(radius),
+            fmt2(radius * 2.0),
+            fmt2(radius),
+            fmt2(radius),
+            fmt2(radius * 2.0)
+        ),
+        PoiShape::Star => {
+            let inner_radius = radius * 0.5;
+            let start_angle = -std::f32::consts::FRAC_PI_2;
+            let mut d = String::new();
+            for i in 0..10 {
+                let angle = start_angle + i as f32 * std::f32::consts::PI / 5.0;
+                let r = if i % 2 == 0 { radius } else { inner_radius };
+                let x = cx + angle.cos() * r;
+                let y = cy + angle.sin() * r;
+                if i == 0 {
+                    d.push_str(&format!("M {} {}", fmt1(x), fmt1(y)));
+                } else {
+                    d.push_str(&format!(" L {} {}", fmt1(x), fmt1(y)));
+                }
+            }
+            d.push_str(" Z");
+            d
+        }
+        PoiShape::Heart => format!(
+            "M {} {} C {} {}, {} {}, {} {} C {} {}, {} {}, {} {} Z",
+            fmt1(cx),
+            fmt1(cy + radius),
+            fmt1(cx - radius),
+            fmt1(cy + radius * 0.45),
+            fmt1(cx - radius * 1.05),
+            fmt1(cy - radius * 0.35),
+            fmt1(cx),
+            fmt1(cy - radius * 0.2),
+            fmt1(cx + radius * 1.05),
+            fmt1(cy - radius * 0.35),
+            fmt1(cx + radius),
+            fmt1(cy + radius * 0.45),
+            fmt1(cx),
+            fmt1(cy + radius)
+        ),
     }
 }
 
