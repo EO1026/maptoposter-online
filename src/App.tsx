@@ -1767,6 +1767,8 @@ export default function MapPosterGenerator() {
               location={location}
               selectedSize={selectedSize}
               colors={colors}
+              customPois={customPois}
+              showCustomPois={poiSource === "custom"}
               fontCacheRef={fontCacheRef}
               selectedPreset={deferredSelectedPreset}
               baseRadius={baseRadius}

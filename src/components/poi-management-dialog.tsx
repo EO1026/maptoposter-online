@@ -23,6 +23,7 @@ import { ArrowUp, CheckCircle2, Loader2, Plus, Search, Trash2, XCircle } from "l
 import * as m from "@/paraglide/messages";
 
 const AMAP_PROXY_ENDPOINT = "https://restapi.amap.com";
+const AMAP_API_KEY_TUTORIAL_URL = "https://lbs.amap.com/api/webservice/create-project-and-key";
 const DEFAULT_POI_TYPE = "landmark";
 const MIN_SEARCH_TERM_LENGTH = 2;
 
@@ -457,7 +458,17 @@ export function POIManagementDialog({
                   <h3 className="text-sm font-medium text-foreground">
                     1. {m.custom_poi_api_key_label()}
                   </h3>
-                  <p className="text-xs text-muted-foreground">{m.custom_poi_api_key_help()}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {m.custom_poi_api_key_help()}{" "}
+                    <a
+                      href={AMAP_API_KEY_TUTORIAL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 transition-opacity hover:opacity-80"
+                    >
+                      {m.custom_poi_api_key_tutorial()}
+                    </a>
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Input

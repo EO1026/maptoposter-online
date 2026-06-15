@@ -63,7 +63,7 @@ export function CustomPOISettings({
                 <span>{m.custom_poi_added_count({ count: String(customPoiCount) })}</span>
               </div>
             </div>
-            <Button type="button" onClick={onManageClick}>
+            <Button type="button" className="h-7 cursor-pointer" onClick={onManageClick}>
               {m.custom_poi_manage_button()}
             </Button>
           </div>

@@ -9,10 +9,13 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { type CustomPOI } from "@/lib/types";
 import { isValidHexColor } from "@/lib/utils";
 
 const previewFontCache = new Map<string, string>();
 let previewFontFamilyCounter = 0;
+const CUSTOM_POIS_SOURCE_ID = "custom-pois-source";
+const CUSTOM_POIS_LAYER_ID = "custom-pois-circle";
 
 // ============================================
 // 类型定义
@@ -60,6 +63,55 @@ export interface MapLocation {
 export interface RoutePoint {
   lat: number;
   lon: number;
+}
+
+type CustomPoiFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point>;
+
+function buildCustomPoisGeoJSON(customPois: CustomPOI[]): CustomPoiFeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: customPois.map((poi) => ({
+      type: "Feature",
+      id: poi.id,
+      properties: {
+        id: poi.id,
+        name: poi.name,
+        poiType: poi.poiType,
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [poi.lng, poi.lat],
+      },
+    })),
+  };
+}
+
+function ensureCustomPoiOverlay(map: maplibregl.Map, theme: ArtisticTheme) {
+  if (!map.getSource(CUSTOM_POIS_SOURCE_ID)) {
+    map.addSource(CUSTOM_POIS_SOURCE_ID, {
+      type: "geojson",
+      data: buildCustomPoisGeoJSON([]),
+    });
+  }
+
+  if (!map.getLayer(CUSTOM_POIS_LAYER_ID)) {
+    map.addLayer({
+      id: CUSTOM_POIS_LAYER_ID,
+      type: "circle",
+      source: CUSTOM_POIS_SOURCE_ID,
+      minzoom: 10,
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 3, 12, 4.5, 14, 6],
+        "circle-color": theme.poi || theme.road_default || "#666",
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": theme.bg,
+        "circle-opacity": 0.95,
+      },
+      layout: {
+        visibility: "none",
+      },
+    });
+  }
 }
 
 // ============================================
@@ -272,6 +324,8 @@ function applyThemePaintProperties(map: maplibregl.Map, theme: ArtisticTheme) {
   safe("road-motorway", "line-color", theme.road_motorway);
   safe("poi", "circle-color", theme.poi || theme.road_default || "#666");
   safe("poi", "circle-stroke-color", theme.bg);
+  safe(CUSTOM_POIS_LAYER_ID, "circle-color", theme.poi || theme.road_default || "#666");
+  safe(CUSTOM_POIS_LAYER_ID, "circle-stroke-color", theme.bg);
   safe("route-line-casing", "line-color", theme.bg);
   safe("route-line", "line-color", theme.route);
 }
@@ -430,6 +484,8 @@ interface MapPosterPreviewProps {
   location: MapLocation;
   city: string;
   country: string;
+  customPois?: CustomPOI[];
+  showCustomPois?: boolean;
   zoom?: number;
   radius?: number;
   theme: ArtisticTheme;
@@ -456,6 +512,8 @@ export function MapPosterPreview({
   location,
   city,
   country,
+  customPois = [],
+  showCustomPois = false,
   zoom = 12,
   radius,
   theme,
@@ -573,6 +631,7 @@ export function MapPosterPreview({
     });
 
     map.on("load", () => {
+      ensureCustomPoiOverlay(map, theme);
       onLoad?.(map);
       // 用初始快照做 jumpTo，把地图放在初始城市
       if (initRadius) {
@@ -621,6 +680,27 @@ export function MapPosterPreview({
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+
+    ensureCustomPoiOverlay(mapRef.current, theme);
+
+    const source = mapRef.current.getSource(
+      CUSTOM_POIS_SOURCE_ID
+    ) as maplibregl.GeoJSONSource | null;
+    if (!source) return;
+
+    source.setData(buildCustomPoisGeoJSON(showCustomPois ? customPois : []));
+
+    if (mapRef.current.getLayer(CUSTOM_POIS_LAYER_ID)) {
+      mapRef.current.setLayoutProperty(
+        CUSTOM_POIS_LAYER_ID,
+        "visibility",
+        showCustomPois && customPois.length > 0 ? "visible" : "none"
+      );
+    }
+  }, [customPois, showCustomPois, theme, isLoaded]);
 
   // 主题颜色变化：用 setPaintProperty，不调用 setStyle()
   useEffect(() => {
