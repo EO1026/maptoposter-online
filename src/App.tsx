@@ -573,6 +573,9 @@ export default function MapPosterGenerator() {
 
   // Persistence Handling
   const isRestored = useRef(false);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestPersistedConfigRef = useRef<string>("");
+  const pendingPersistConfigRef = useRef<string | null>(null);
 
   const handleLocationModeChange = (mode: "search" | "coordinates") => {
     setLocationMode(mode);
@@ -606,6 +609,12 @@ export default function MapPosterGenerator() {
     },
   });
 
+  const persistConfig = (configJson: string) => {
+    if (!isRestored.current || latestPersistedConfigRef.current === configJson) return;
+    localStorage.setItem("maptoposter_config", configJson);
+    latestPersistedConfigRef.current = configJson;
+  };
+
   // Persistence Effect: Save settings to LocalStorage whenever they change
   useEffect(() => {
     // Only save if we have finished the initial restoration from LocalStorage
@@ -625,10 +634,28 @@ export default function MapPosterGenerator() {
       showCity,
       showCountry,
       poiSource,
-      customPois,
-      amapApiKey,
+        customPois,
+        amapApiKey,
+      };
+    const configJson = JSON.stringify(config);
+    pendingPersistConfigRef.current = configJson;
+
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+    }
+
+    persistTimerRef.current = setTimeout(() => {
+      persistConfig(configJson);
+      pendingPersistConfigRef.current = null;
+      persistTimerRef.current = null;
+    }, 400);
+
+    return () => {
+      if (persistTimerRef.current) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
     };
-    localStorage.setItem("maptoposter_config", JSON.stringify(config));
   }, [
     selectedCountry,
     selectedState,
@@ -646,6 +673,19 @@ export default function MapPosterGenerator() {
     customPois,
     amapApiKey,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingPersistConfigRef.current) {
+        persistConfig(pendingPersistConfigRef.current);
+        pendingPersistConfigRef.current = null;
+      }
+      if (persistTimerRef.current) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const savedConfig = localStorage.getItem("maptoposter_config");
@@ -1736,7 +1776,7 @@ export default function MapPosterGenerator() {
               showCountry={showCountry}
               previewRef={previewRef}
               previewHint={m.preview_actual_result()}
-              interactive={true} // locationMode === "coordinates"
+              interactive={locationMode === "coordinates"}
               onMove={(loc) => {
                 setLocation((prev) => ({ ...prev, lat: loc.lat, lng: loc.lon }));
               }}

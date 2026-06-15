@@ -11,6 +11,9 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { isValidHexColor } from "@/lib/utils";
 
+const previewFontCache = new Map<string, string>();
+let previewFontFamilyCounter = 0;
+
 // ============================================
 // 类型定义
 // ============================================
@@ -490,30 +493,30 @@ export function MapPosterPreview({
   // 500ms 防抖：快速切换预设时避免频繁创建/销毁 style 元素
   const fontData = fontCacheRef.current?.get(selectedPreset)?.data;
   useEffect(() => {
-    let cleanupFont: (() => void) | undefined;
     const timer = setTimeout(() => {
       if (!fontData) {
         setFontFamily("sans-serif");
         return;
       }
 
+      const cachedFamily = previewFontCache.get(selectedPreset);
+      if (cachedFamily) {
+        setFontFamily(cachedFamily);
+        return;
+      }
+
       const blob = new Blob([fontData as BlobPart], { type: "font/otf" });
       const objectUrl = URL.createObjectURL(blob);
+      const familyName = `PreviewFont_${previewFontFamilyCounter++}`;
       const style = document.createElement("style");
-      style.textContent = `@font-face { font-family: "CustomFont"; src: url("${objectUrl}"); }`;
+      style.textContent = `@font-face { font-family: "${familyName}"; src: url("${objectUrl}"); }`;
       document.head.appendChild(style);
-      setFontFamily("CustomFont");
-
-      cleanupFont = () => {
-        document.head.removeChild(style);
-        URL.revokeObjectURL(objectUrl);
-        setFontFamily("sans-serif");
-      };
+      previewFontCache.set(selectedPreset, familyName);
+      setFontFamily(familyName);
     }, 500);
 
     return () => {
       clearTimeout(timer);
-      cleanupFont?.();
     };
   }, [fontData, selectedPreset]);
 
@@ -550,7 +553,6 @@ export function MapPosterPreview({
       center: [initLon, initLat],
       zoom: zoom,
       attributionControl: false,
-      canvasContextAttributes: { preserveDrawingBuffer: true },
       interactive: true, // 始终 true 让 handler 对象存在，后续通过 effect 控制 enable/disable
     });
     console.log(
@@ -625,7 +627,20 @@ export function MapPosterPreview({
     if (!mapRef.current || !isLoaded) return;
     if (isDraggingRef.current) return; // 拖拽中跳过，避免 13 次 setPaintProperty 调用
     applyThemePaintProperties(mapRef.current, theme);
-  }, [theme, isLoaded]);
+  }, [
+    theme.bg,
+    theme.water,
+    theme.parks,
+    theme.road_default,
+    theme.road_residential,
+    theme.road_tertiary,
+    theme.road_secondary,
+    theme.road_primary,
+    theme.road_motorway,
+    theme.poi,
+    theme.route,
+    isLoaded,
+  ]);
 
   // 交互能力切换（坐标模式可拖拽，搜索模式只读）
   useEffect(() => {
