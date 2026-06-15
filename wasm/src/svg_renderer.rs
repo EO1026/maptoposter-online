@@ -17,6 +17,7 @@ pub struct SvgRenderer {
     y_factor: f64,
     text_position: TextPosition,
     next_path_id: u32,
+    next_mask_id: u32,
     next_pin_id: u32,
 }
 
@@ -42,6 +43,7 @@ impl SvgRenderer {
             y_factor: height as f64 / bounds.height(),
             text_position,
             next_path_id: 0,
+            next_mask_id: 0,
             next_pin_id: 0,
         }
     }
@@ -98,6 +100,45 @@ impl SvgRenderer {
                 escape_attr(color_hex)
             ));
         }
+    }
+
+    pub fn draw_parks_bin_masked_by_water(
+        &mut self,
+        parks_data: &[f64],
+        water_data: &[f64],
+        color_hex: &str,
+    ) {
+        if parks_data.is_empty() || parks_data[0] as usize == 0 {
+            return;
+        }
+
+        let parks_d = self.build_polygon_path_data(parks_data);
+        if parks_d.is_empty() {
+            return;
+        }
+
+        let water_d = self.build_polygon_path_data(water_data);
+        if water_d.is_empty() {
+            self.svg.push_str(&format!(
+                r#"<path d="{parks_d}" fill="{}" fill-rule="evenodd"/>"#,
+                escape_attr(color_hex)
+            ));
+            return;
+        }
+
+        let mask_id = format!("m{}", self.next_mask_id);
+        self.next_mask_id += 1;
+        self.svg.push_str(&format!(
+            r#"<defs><mask id="{mask_id}" maskUnits="userSpaceOnUse" x="0" y="0" width="{}" height="{}"><rect x="0" y="0" width="{}" height="{}" fill="white"/><path d="{water_d}" fill="black" fill-rule="evenodd"/></mask></defs>"#,
+            self.width,
+            self.height,
+            self.width,
+            self.height
+        ));
+        self.svg.push_str(&format!(
+            r#"<path d="{parks_d}" fill="{}" fill-rule="evenodd" mask="url(#{mask_id})"/>"#,
+            escape_attr(color_hex)
+        ));
     }
 
     pub fn draw_roads_bin_scaled(&mut self, data: &[f64], scale_factor: f32) -> [f64; 6] {
@@ -467,6 +508,48 @@ impl SvgRenderer {
         self.svg
             .push_str(&format!(r#"<defs><path id="{id}" d="{d}"/></defs>"#));
         id
+    }
+
+    fn build_polygon_path_data(&self, data: &[f64]) -> String {
+        if data.is_empty() || data[0] as usize == 0 {
+            return String::new();
+        }
+
+        let mut offset = 1;
+        let poly_count = data[0] as usize;
+        let mut d = String::new();
+
+        for _ in 0..poly_count {
+            if offset + 2 > data.len() {
+                break;
+            }
+            let ext_count = data[offset] as usize;
+            let int_ring_count = data[offset + 1] as usize;
+            offset += 2;
+
+            if offset + ext_count * 2 <= data.len() && ext_count >= 3 {
+                push_ring_path(&mut d, data, offset, ext_count, |coord| {
+                    self.world_to_screen(coord)
+                });
+            }
+            offset += ext_count * 2;
+
+            for _ in 0..int_ring_count {
+                if offset + 1 > data.len() {
+                    break;
+                }
+                let count = data[offset] as usize;
+                offset += 1;
+                if offset + count * 2 <= data.len() && count >= 3 {
+                    push_ring_path(&mut d, data, offset, count, |coord| {
+                        self.world_to_screen(coord)
+                    });
+                }
+                offset += count * 2;
+            }
+        }
+
+        d
     }
 }
 

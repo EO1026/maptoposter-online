@@ -754,17 +754,6 @@ export function MapPosterPreview({
     // 拖拽中跳过 flyTo：用户正在拖拽，flyTo 会打断交互并造成卡顿
     if (isDraggingRef.current) return;
 
-    const currentCenter = mapRef.current.getCenter();
-    const targetLat = location.lat;
-    const targetLon = location.lon;
-    // 跳过 flyTo：地图已在此位置，避免 moveend → setState → flyTo 循环
-    if (
-      Math.abs(currentCenter.lat - targetLat) < 0.000001 &&
-      Math.abs(currentCenter.lng - targetLon) < 0.000001
-    ) {
-      return;
-    }
-
     const targetZoom = radius
       ? getZoomFromRadius(
           location,
@@ -773,6 +762,20 @@ export function MapPosterPreview({
           mapRef.current.getCanvas().height
         )
       : zoom;
+
+    const currentCenter = mapRef.current.getCenter();
+    const currentZoom = mapRef.current.getZoom();
+    const targetLat = location.lat;
+    const targetLon = location.lon;
+    // 只有中心点和 zoom 都已匹配时才跳过。
+    // 否则半径变化时会因为中心点没变而错误地不触发缩放动画。
+    if (
+      Math.abs(currentCenter.lat - targetLat) < 0.000001 &&
+      Math.abs(currentCenter.lng - targetLon) < 0.000001 &&
+      Math.abs(currentZoom - targetZoom) < 0.000001
+    ) {
+      return;
+    }
 
     mapRef.current.flyTo({
       center: [targetLon, targetLat],

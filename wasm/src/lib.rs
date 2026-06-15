@@ -284,7 +284,7 @@ fn render_map_binary_internal(
     time_end("render_map_bin: draw_water");
 
     time("render_map_bin: draw_parks");
-    renderer.draw_polygons_bin(parks_bin, &parks_color);
+    renderer.draw_parks_bin_masked_by_water(parks_bin, water_bin, &parks_color);
     time_end("render_map_bin: draw_parks");
 
     time("render_map_bin: draw_roads");
@@ -397,7 +397,7 @@ fn render_map_binary_svg(
     time_end("render_map_bin: draw_water");
 
     time("render_map_bin: draw_parks");
-    renderer.draw_polygons_bin(parks_bin, &parks_color);
+    renderer.draw_parks_bin_masked_by_water(parks_bin, water_bin, &parks_color);
     time_end("render_map_bin: draw_parks");
 
     time("render_map_bin: draw_roads");

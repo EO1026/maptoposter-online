@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 // [Road Casing] 新增 LineCap / LineJoin，用于道路圆头描边
 use tiny_skia::{
-    Color, FillRule, GradientStop, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Point,
-    RadialGradient, SpreadMode, Stroke, Transform,
+    BlendMode, Color, FillRule, GradientStop, LineCap, LineJoin, Paint, PathBuilder, Pixmap,
+    PixmapPaint, Point, RadialGradient, SpreadMode, Stroke, Transform,
 };
 
 use crate::projection;
@@ -296,60 +296,12 @@ impl MapRenderer {
             &format!("🌊 开始绘制 {} 个多边形，颜色: {}", poly_count, color_hex).into(),
         );
 
-        let mut offset = 1;
         let color = parse_hex_color(color_hex);
+        let paths = self.build_polygon_paths(data);
+        let found = !paths.is_empty();
 
-        let mut found = false;
-
-        for _idx in 0..poly_count {
-            if offset + 2 > data.len() {
-                break;
-            }
-            let ext_count = data[offset] as usize;
-            let int_ring_count = data[offset + 1] as usize;
-            offset += 2;
-
-            let mut pb = PathBuilder::new();
-            let mut valid_polygon = false;
-
-            if offset + ext_count * 2 <= data.len() && ext_count >= 3 {
-                let (sx, sy) = self.world_to_screen((data[offset], data[offset + 1]));
-                pb.move_to(sx, sy);
-                for i in 1..ext_count {
-                    let (sx, sy) =
-                        self.world_to_screen((data[offset + i * 2], data[offset + i * 2 + 1]));
-                    pb.line_to(sx, sy);
-                }
-                pb.close();
-                valid_polygon = true;
-                found = true;
-            }
-            offset += ext_count * 2;
-
-            for _ in 0..int_ring_count {
-                if offset + 1 > data.len() {
-                    break;
-                }
-                let count = data[offset] as usize;
-                offset += 1;
-                if offset + count * 2 <= data.len() && count >= 3 {
-                    let (sx, sy) = self.world_to_screen((data[offset], data[offset + 1]));
-                    pb.move_to(sx, sy);
-                    for i in 1..count {
-                        let (sx, sy) =
-                            self.world_to_screen((data[offset + i * 2], data[offset + i * 2 + 1]));
-                        pb.line_to(sx, sy);
-                    }
-                    pb.close();
-                }
-                offset += count * 2;
-            }
-
-            if valid_polygon {
-                if let Some(path) = pb.finish() {
-                    self.fill_polygon_path(&path, color);
-                }
-            }
+        for path in &paths {
+            Self::fill_polygon_path_on(&mut self.pixmap, path, color, BlendMode::SourceOver);
         }
 
         if found {
@@ -361,6 +313,42 @@ impl MapRenderer {
                 &format!("⚠️  未找到有效的多边形数据，颜色: {}", color_hex).into(),
             );
         }
+    }
+
+    pub fn draw_parks_bin_masked_by_water(
+        &mut self,
+        parks_data: &[f64],
+        water_data: &[f64],
+        color_hex: &str,
+    ) {
+        if parks_data.is_empty() || parks_data[0] as usize == 0 {
+            return;
+        }
+
+        let Some(mut parks_layer) = Pixmap::new(self.render_width(), self.render_height()) else {
+            self.draw_polygons_bin(parks_data, color_hex);
+            return;
+        };
+
+        let color = parse_hex_color(color_hex);
+        let park_paths = self.build_polygon_paths(parks_data);
+        for path in &park_paths {
+            Self::fill_polygon_path_on(&mut parks_layer, path, color, BlendMode::SourceOver);
+        }
+
+        let water_paths = self.build_polygon_paths(water_data);
+        for path in &water_paths {
+            Self::fill_polygon_path_on(&mut parks_layer, path, color, BlendMode::Clear);
+        }
+
+        self.pixmap.draw_pixmap(
+            0,
+            0,
+            parks_layer.as_ref(),
+            &PixmapPaint::default(),
+            Transform::identity(),
+            None,
+        );
     }
 
     /// 绘制道路
@@ -1217,11 +1205,20 @@ impl MapRenderer {
     }
 
     fn fill_polygon_path(&mut self, path: &tiny_skia::Path, color: Color) {
+        Self::fill_polygon_path_on(&mut self.pixmap, path, color, BlendMode::SourceOver);
+    }
+
+    fn fill_polygon_path_on(
+        pixmap: &mut Pixmap,
+        path: &tiny_skia::Path,
+        color: Color,
+        blend_mode: BlendMode,
+    ) {
         let mut paint = Paint::default();
         paint.set_color(color);
         paint.anti_alias = true;
-        self.pixmap
-            .fill_path(path, &paint, FillRule::EvenOdd, Transform::identity(), None);
+        paint.blend_mode = blend_mode;
+        pixmap.fill_path(path, &paint, FillRule::EvenOdd, Transform::identity(), None);
     }
 
     fn add_poly_to_path(&self, pb: &mut PathBuilder, poly: &PolyFeature) -> bool {
@@ -1253,6 +1250,68 @@ impl MapRenderer {
         }
 
         true
+    }
+
+    fn build_polygon_paths(&self, data: &[f64]) -> Vec<tiny_skia::Path> {
+        if data.is_empty() {
+            return Vec::new();
+        }
+
+        let poly_count = data[0] as usize;
+        let mut offset = 1;
+        let mut paths = Vec::with_capacity(poly_count);
+
+        for _ in 0..poly_count {
+            if offset + 2 > data.len() {
+                break;
+            }
+            let ext_count = data[offset] as usize;
+            let int_ring_count = data[offset + 1] as usize;
+            offset += 2;
+
+            let mut pb = PathBuilder::new();
+            let mut valid_polygon = false;
+
+            if offset + ext_count * 2 <= data.len() && ext_count >= 3 {
+                let (sx, sy) = self.world_to_screen((data[offset], data[offset + 1]));
+                pb.move_to(sx, sy);
+                for i in 1..ext_count {
+                    let (sx, sy) =
+                        self.world_to_screen((data[offset + i * 2], data[offset + i * 2 + 1]));
+                    pb.line_to(sx, sy);
+                }
+                pb.close();
+                valid_polygon = true;
+            }
+            offset += ext_count * 2;
+
+            for _ in 0..int_ring_count {
+                if offset + 1 > data.len() {
+                    break;
+                }
+                let count = data[offset] as usize;
+                offset += 1;
+                if offset + count * 2 <= data.len() && count >= 3 {
+                    let (sx, sy) = self.world_to_screen((data[offset], data[offset + 1]));
+                    pb.move_to(sx, sy);
+                    for i in 1..count {
+                        let (sx, sy) =
+                            self.world_to_screen((data[offset + i * 2], data[offset + i * 2 + 1]));
+                        pb.line_to(sx, sy);
+                    }
+                    pb.close();
+                }
+                offset += count * 2;
+            }
+
+            if valid_polygon {
+                if let Some(path) = pb.finish() {
+                    paths.push(path);
+                }
+            }
+        }
+
+        paths
     }
 
     /// 绘制文字（使用 fontdue）
